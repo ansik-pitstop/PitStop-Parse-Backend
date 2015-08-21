@@ -5,7 +5,7 @@
  var EDMUNDS_API = {
 
    host: "api.edmunds.com",
-   tail: "fmt=json&api_key=dfzumkss4nmcp6pu2uh8gssv",
+   tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
    requestPaths: {
      makeModelYearId: function (make, model, year) {
        var path = "/api/vehicle/v2/";
