@@ -1,0 +1,14 @@
+{
+  "global": {
+    "parseVersion": "1.5.0"
+  },
+  "applications": {
+    "PitStop": {
+      "applicationId": "zLnXL3QTYZ7SSkdIuS7rAo2EmwCA0Tm4kfgpP8SU",
+      "masterKey": "Bjc3HrjTF3xgMUBR2n4MYc6OpmbRE5OMt19692DF"
+    },
+    "_default": {
+      "link": "PitStop"
+    }
+  }
+}
