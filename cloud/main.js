@@ -286,12 +286,12 @@ Parse.Cloud.define("carServicesUpdateLight", function(request, status){
       car.save(null, {
         success: function (savedCar) {
           console.log("car saved");
-          status.success("car saved");
+          response.success("car saved");
         },
         error: function (saveError) {
           console.log("car not saved");
           console.error(saveError);
-          status.error("car not saved");
+          response.error("car not saved");
         }
       });
 
