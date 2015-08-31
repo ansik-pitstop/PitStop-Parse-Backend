@@ -235,8 +235,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     for (var i = 0; i < edmundsServices.length; i++) {
 
       var serviceQuery = new Parse.Query("Service");
-      console.log(edmundsServices[i])
-      console.log(edmundsServices)
 
       serviceQuery.equalTo("action", edmundsServices[i].action);
       serviceQuery.equalTo("item", edmundsServices[i].item);
@@ -322,6 +320,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
           item: edmundsServices[i].item
         });
         console.error("ERROR: ", error);
+        console.log(edmundsServices[i])
+        console.log(edmundsServices)
 
         }
       });
