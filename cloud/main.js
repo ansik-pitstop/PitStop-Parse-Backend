@@ -81,7 +81,6 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
   // getting the scan object
   var scan = request.object;
-  scan.get = function(property){return scan[property]}
 
   // stopping the function if not required
   if (scan.get("runAfterSave") !== true) {
@@ -89,7 +88,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
   }
 
   //run cloud function
-  Parse.Cloud.run("carServicesUpdate", { scannerId: scan.get("scannerId"), mileage: scan.get("mileage")}, {
+  Parse.Cloud.run("carServicesUpdate", { scan: scan}, {
       success: function(result){
         console.log("success: ")
         console.log(result)
@@ -136,7 +135,8 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 Parse.Cloud.define("carServicesUpdate", function(request, status) {
   //request object is scan
-  scan = request.params
+  scan = request.params.scan
+
   // Initializing variables
   var car = null;
   var carMakeModelYearId = null;
