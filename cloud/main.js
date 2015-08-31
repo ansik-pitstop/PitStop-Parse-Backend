@@ -234,95 +234,97 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
 
-    var serviceQuery = new Parse.Query("Service");
+      var serviceQuery = new Parse.Query("Service");
+      console.log(edmundsServices[i])
+      console.log(edmundsServices)
 
-    serviceQuery.equalTo("action", edmundsServices[i].action);
-    serviceQuery.equalTo("item", edmundsServices[i].item);
-    serviceQuery.find({
-    success: function (results) {
+      serviceQuery.equalTo("action", edmundsServices[i].action);
+      serviceQuery.equalTo("item", edmundsServices[i].item);
+      serviceQuery.find({
+      success: function (results) {
 
-    if (results.length === 0) {
-    counter++;
-    if (i === counter) {
-      serviceStackIsFull();
-    }
-    return;
-    }
+      if (results.length === 0) {
+      counter++;
+      if (i === counter) {
+        serviceStackIsFull();
+      }
+      return;
+      }
 
-    // getting the first service found
-    var loadedService = results[0];
-    // getting the edmunds service from the for loop.
-    var toCheckService = edmundsServices[i];
+      // getting the first service found
+      var loadedService = results[0];
+      // getting the edmunds service from the for loop.
+      var toCheckService = edmundsServices[i];
 
-    // quering for service history
-    var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
-    ServiceHistoryQuery.equalTo("serviceId", loadedService.get("serviceId"));
-    ServiceHistoryQuery.equalTo("carId", car.id);
-    ServiceHistoryQuery.find({
-      success: function (serviceHistoryArray) {
+      // quering for service history
+      var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
+      ServiceHistoryQuery.equalTo("serviceId", loadedService.get("serviceId"));
+      ServiceHistoryQuery.equalTo("carId", car.id);
+      ServiceHistoryQuery.find({
+        success: function (serviceHistoryArray) {
 
-        // if no history found
-        if (serviceHistoryArray.length === 0) {
-          console.log("NO HISTORY FOUND FOR " + loadedService.get("serviceId") + " || " + counter + " - " + edmundsServices.length);
-          serviceStack.push(loadedService);
-        } else {
-          var history = serviceHistoryArray[serviceHistoryArray.length - 1];
-                             
-          if (loadedService.get("intervalMileage") !== 1) {
-            if (loadedService.get("priority") == 4){
-            //high priority items
-                var currentIntervalMileage = carMileage - history.get("mileage");
-             
-                if (currentIntervalMileage - loadedService.get("intervalMileage") > 500 ||
-                 loadedService.get("intMileage") - currentIntervalMileage < 500)  {
-             
-                    console.log("HISTORY: " + history.get("mileage") + " ||||| INTERVAL: " + loadedService.get("intervalMileage"));
-                    serviceStack.push(loadedService);
-                }
-              }else{
-              //suggested service
-                var currentIntervalMileage = carMileage % loadedService.get("intervalMileage");
-             
-                if (currentIntervalMileage < 1000){
-                    serviceStack.push(loadedService);
-                }
-             }
+          // if no history found
+          if (serviceHistoryArray.length === 0) {
+            console.log("NO HISTORY FOUND FOR " + loadedService.get("serviceId") + " || " + counter + " - " + edmundsServices.length);
+            serviceStack.push(loadedService);
+          } else {
+            var history = serviceHistoryArray[serviceHistoryArray.length - 1];
+
+            if (loadedService.get("intervalMileage") !== 1) {
+              if (loadedService.get("priority") == 4){
+              //high priority items
+                  var currentIntervalMileage = carMileage - history.get("mileage");
+
+                  if (currentIntervalMileage - loadedService.get("intervalMileage") > 500 ||
+                   loadedService.get("intMileage") - currentIntervalMileage < 500)  {
+
+                      console.log("HISTORY: " + history.get("mileage") + " ||||| INTERVAL: " + loadedService.get("intervalMileage"));
+                      serviceStack.push(loadedService);
+                  }
+                }else{
+                //suggested service
+                  var currentIntervalMileage = carMileage % loadedService.get("intervalMileage");
+
+                  if (currentIntervalMileage < 1000){
+                      serviceStack.push(loadedService);
+                  }
+               }
+            }
+
           }
 
+          counter++;
+          if (i === counter) {
+            serviceStackIsFull();
+          }
+
+         },
+          error: function (error) {
+
+            counter++;
+            if (i === counter) {
+              serviceStackIsFull();
+            }
+
+            console.error(error);
+
         }
 
-        counter++;
-        if (i === counter) {
-          serviceStackIsFull();
-        }
+      });
 
-      },
+    },
       error: function (error) {
 
-        counter++;
-        if (i === counter) {
-          serviceStackIsFull();
+        console.error(
+        "Could not find a service with action and Item ",
+        {
+          action: edmundsServices[i].action,
+          item: edmundsServices[i].item
+        });
+        console.error("ERROR: ", error);
+
         }
-
-        console.error(error);
-
-      }
-
-    });
-
-  },
-    error: function (error) {
-
-      console.error(
-      "Could not find a service with action and Item ",
-      {
-        action: edmundsServices[i].action,
-        item: edmundsServices[i].item
       });
-      console.error("ERROR: ", error);
-
-      }
-    });
     }
 
 
