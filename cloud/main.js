@@ -20,6 +20,58 @@
 
  };
 
+/*
+ 
+ Car aftersave: load calibration services
+ */
+ 
+
+Parse.Cloud.afterSave("Car", function(request){
+//first time saving the car,
+//set calibration services (priority = 4)
+    var car = request.object;
+    if (request.object.existed() == true){
+        return;
+    }
+                      
+                      var query = new Parse.Query("Service");
+                      query.equalTo("priority", 4);
+                      query.find({
+                                 success: function (services) {
+                                 //function to send services to app
+                                 serviceStack = services;
+                                 servicesDue = [];
+                                 console.log('services');
+                                 console.log(services);
+                                 
+                                 for (var i = 0; i < serviceStack.length; i++) {
+                                 var service = serviceStack[i];
+                                 if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+                                 }
+                                 car.set("serviceDue", true);
+                                 car.set("servicesDue", servicesDue);
+                                 car.save(null, {
+                                          success: function (savedCar) {
+                                          console.log("car saved");
+                                          },
+                                          error: function (saveError) {
+                                          console.log("car not saved");
+                                          console.error(saveError);
+                                          }
+                                          });
+                                 
+                                 
+                                 },
+                                 error: function (error) {
+                                 console.error("Could not find services with priority = ", 4);
+                                 console.error("ERROR: ", error);
+                                 }
+                                 });
+                      
+                      
+    
+});
+
  /*
   afterSave Event for Scan Object
   */
@@ -30,9 +82,9 @@ Parse.Cloud.afterSave("Scan", function(request) {
   var scan = request.object;
 
   // stopping the function if not required
-  if (scan.get("runAfterSave") !== true) {
+  /*if (scan.get("runAfterSave") !== true) {
     return;
-  }
+  }*/
 
   // Initializing variables
   var car = null;
@@ -40,6 +92,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
   var carMileage = 0;
   var serviceStack = [];
   var edmundsServices = [];
+  var carType = null
 
   // query for the car associated with this Scan
   var query = new Parse.Query("Car");
@@ -63,7 +116,6 @@ Parse.Cloud.afterSave("Scan", function(request) {
     // assigning the loadedCar to global car
     car = loadedCar;
     var scanMileage = scan.get("mileage");
-    var mileageThreshold = 100 //put something reasonable here
 
     // setting the car mileage
     if (scan.get("PIDs") === undefined) {
@@ -71,6 +123,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     } else {
       carMileage = scanMileage + car.get("baseMileage");
     }
+      
 
     // making a request to Edmunds for makeModelYearId
     Parse.Cloud.httpRequest({
@@ -126,6 +179,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
       for (var i = 0; i < edmundsServices.length; i++) {
 
         var serviceQuery = new Parse.Query("Service");
+        
         serviceQuery.equalTo("action", edmundsServices[i].action);
         serviceQuery.equalTo("item", edmundsServices[i].item);
         serviceQuery.find({
@@ -146,25 +200,37 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
             // quering for service history
             var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
-            ServiceHistoryQuery.equalTo("serviceId", loadedService.get("Id"));
+            ServiceHistoryQuery.equalTo("serviceId", loadedService.get("serviceId"));
             ServiceHistoryQuery.equalTo("carId", car.id);
             ServiceHistoryQuery.find({
               success: function (serviceHistoryArray) {
 
                 // if no history found
                 if (serviceHistoryArray.length === 0) {
-                  console.log("NO HISTORY FOUND FOR " + loadedService.get("Id") + " || " + counter + " - " + edmundsServices.length);
+                  console.log("NO HISTORY FOUND FOR " + loadedService.get("serviceId") + " || " + counter + " - " + edmundsServices.length);
                   serviceStack.push(loadedService);
                 } else {
                   var history = serviceHistoryArray[serviceHistoryArray.length - 1];
-                  var currentIntervalMileage = carMileage - history.get("mileage");
-                  // If service is due
-                  if (loadedService.get("intMileage") !== 1) {
-                    if (currentIntervalMileage - loadedService.get("intMileage") > 50 ||
-                        loadedService.get("intMileage") - currentIntervalMileage < 50)  {
-                      console.log("HISTORY: " + history.get("mileage") + " ||||| INTERVAL: " + loadedService.get("intMileage"));
-                        serviceStack.push(loadedService);
-                    }
+                                     
+                  if (loadedService.get("intervalMileage") !== 1) {
+                                     if (loadedService.get("priority") == 4){
+                                     //high priority items
+                                        var currentIntervalMileage = carMileage - history.get("mileage");
+                                     
+                                        if (currentIntervalMileage - loadedService.get("intervalMileage") > 500 ||
+                                         loadedService.get("intMileage") - currentIntervalMileage < 500)  {
+                                     
+                                            console.log("HISTORY: " + history.get("mileage") + " ||||| INTERVAL: " + loadedService.get("intervalMileage"));
+                                            serviceStack.push(loadedService);
+                                        }
+                                     }else{
+                                     //suggested service
+                                        var currentIntervalMileage = carMileage % loadedService.get("intervalMileage");
+                                     
+                                        if (currentIntervalMileage < 1000){
+                                            serviceStack.push(loadedService);
+                                        }
+                                     }
                   }
 
                 }
@@ -215,17 +281,19 @@ Parse.Cloud.afterSave("Scan", function(request) {
     var serviceStackIsFull = function () {
       console.log("Service Stack is Full");
       console.log(serviceStack);
+      //return subset of services by priority
+      //serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
 
       var servicesDue = car.get("servicesDue");
       var prioritySum = 0;
       for (var i = 0; i < serviceStack.length; i++) {
         var service = serviceStack[i];
         prioritySum += service.get("priority");
-        if (servicesDue.indexOf(service.get("Id")) === -1) servicesDue.push(service.get("Id"));
+        if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
       }
       console.log(prioritySum);
 
-      if (prioritySum > 2) {
+      if (prioritySum > 5) {
         //save new notification
         saveNotification(serviceStack);
         car.set("serviceDue", true);
