@@ -311,12 +311,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     },
       error: function (error) {
 
-        console.error(
-        "Could not find a service with action and Item ",
-        {
-          action: edmundsServices[i].action,
-          item: edmundsServices[i].item
-        });
+        console.error("Could not find a service with action and Item ");
         console.error("ERROR: ", error);
 
         }
