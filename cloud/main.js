@@ -81,6 +81,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
   // getting the scan object
   var scan = request.object;
+  scan.get = function(property){return scan[property]}
 
   // stopping the function if not required
   if (scan.get("runAfterSave") !== true) {
