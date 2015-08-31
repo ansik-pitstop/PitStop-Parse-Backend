@@ -88,7 +88,12 @@ Parse.Cloud.afterSave("Scan", function(request) {
   }
 
   //run cloud function
-  Parse.Cloud.run("carServicesUpdate", { scan: scan}, {
+  Parse.Cloud.run("carServicesUpdate", {
+        scannerId: scan.get("scannerId"),
+        mileage: scan.get("mileage"),
+        PIDs: scan.get("PIDs"),
+        id: scan.id
+      }, {
       success: function(result){
         console.log("success: ")
         console.log(result)
@@ -135,7 +140,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 Parse.Cloud.define("carServicesUpdate", function(request, status) {
   //request object is scan
-  scan = request.params.scan
+  scan = request.params;
 
   // Initializing variables
   var car = null;
@@ -143,17 +148,17 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   var carMileage = 0;
   var serviceStack = [];
   var edmundsServices = [];
-  var carType = null
+  //var carType = null;
 
   // query for the car associated with this Scan
   var query = new Parse.Query("Car");
-  query.equalTo("scannerId", scan.get('scannerId'));
+  query.equalTo("scannerId", scan["scannerId"]);
   query.find({
   success: function (cars) {
   foundCar(cars[0]);
   },
   error: function (error) {
-  console.error("Could not find the car with ScannerId: ", scan.get('scannerId'));
+  console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
   console.error("ERROR: ", error);
   }
   });
@@ -166,10 +171,10 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
     // assigning the loadedCar to global car
     car = loadedCar;
-    var scanMileage = scan.get("mileage");
+    var scanMileage = scan["mileage"];
 
     // setting the car mileage
-    if (scan.get("PIDs") === undefined) {
+    if (scan["PIDs"] === undefined) {
     carMileage = scanMileage;
     } else {
     carMileage = scanMileage + car.get("baseMileage");
