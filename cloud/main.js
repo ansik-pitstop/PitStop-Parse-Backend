@@ -121,10 +121,12 @@ Parse.Cloud.define("carServicesUpdateLight", function(request, status){
   query.find({
     success: function (cars) {
       foundCar(cars[0]);
+      response.success("car found");
     },
     error: function (error) {
       console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
       console.error("ERROR: ", error);
+      response.error("error");
     }
   });
 
@@ -286,12 +288,12 @@ Parse.Cloud.define("carServicesUpdateLight", function(request, status){
       car.save(null, {
         success: function (savedCar) {
           console.log("car saved");
-          response.success("car saved");
+
         },
         error: function (saveError) {
           console.log("car not saved");
           console.error(saveError);
-          response.error("car not saved");
+
         }
       });
 
