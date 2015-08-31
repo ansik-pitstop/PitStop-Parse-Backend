@@ -88,7 +88,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
   }
 
   //run cloud function
-  Parse.Cloud.run("carServicesUpdate", { //run with carServicesUpdate or carServicesUpdateLight
+  Parse.Cloud.run("carServicesUpdateLight", { //run with carServicesUpdate or carServicesUpdateLight
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
         PIDs: scan.get("PIDs"),
