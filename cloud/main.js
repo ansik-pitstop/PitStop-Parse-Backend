@@ -473,10 +473,9 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             for (var i = 0; i < cars.length; i++) {
 
                 var car = cars[i];
-                console.log(car.toString());
-                console.log(Object.keys(car).toString());
+                console.log(car.get("make").toString());
 
-                foundCar(cars);
+                foundCar(car);
             }
 
             //Batch save cars
