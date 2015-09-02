@@ -353,12 +353,12 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     car.save(null, {
       success: function (savedCar) {
         console.log("car saved");
-        status.success("car saved");
+        status.success("car saved"); // success for cloud function
       },
       error: function (saveError) {
         console.log("car not saved");
         console.error(saveError);
-        status.error("car not saved");
+        status.error("car not saved"); //failure for cloud function
       }
     });
 
