@@ -408,7 +408,7 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 
         Parse.Cloud.useMasterKey;
         var config = Parse.Config.current();
-        var mileageAddition = config.biWeeklyAverageMiles / 2
+        var mileageAddition = (config.biWeeklyAverageMiles / 2);
 
         var carQuery = new Parse.Query("Car");
         // Week Ago: Date
@@ -430,10 +430,13 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 
                 Parse.Object.saveAll(cars, {
                     success: function(data){
-                        console.log("autoMileageUpdate Success")
+                        console.log("autoMileageUpdate Success");
+                        status.success("Mileage for cars saved");
+
                     },
                     error: function(error){
-                        console.error("Error updating mileage from autoMileageUpdate: ", error)
+                        console.error("Error updating mileage from autoMileageUpdate: ", error);
+                        status.error("Mileage for cars not saved");
                     }
                 });
 
