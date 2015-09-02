@@ -408,43 +408,46 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 
         Parse.Cloud.useMasterKey;
         var config = Parse.Config.current();
-        var mileageAddition = (config.biWeeklyAverageMiles / 2);
+        Parse.Config().get().then(function(config){
 
-        var carQuery = new Parse.Query("Car");
-        // Week Ago: Date
-        var d = new Date();
-        var time = (7 * 24 * 3600 * 1000);
-        var weekAgoDate = new Date(d.getTime() - (time));
-        // find cars that haven't been updated in at least a week
-        carQuery.lessThanOrEqualTo( "updatedAt", weekAgoDate);
-        carQuery.find({
-            success: function (cars) {
-                //update all car mileage
-                for (var i = 0; i < cars.length; i++) {
-                    var car = cars[i];
-                    var mileage = car.get("baseMileage") + mileageAddition; // add baseMileage
+            var mileageAddition = (config.biWeeklyAverageMiles / 2);
 
-                    car.set("baseMileage", mileage);
-                    car.set("totalMileage", mileage);
-                }
+            var carQuery = new Parse.Query("Car");
+            // Week Ago: Date
+            var d = new Date();
+            var time = (7 * 24 * 3600 * 1000);
+            var weekAgoDate = new Date(d.getTime() - (time));
+            // find cars that haven't been updated in at least a week
+            carQuery.lessThanOrEqualTo( "updatedAt", weekAgoDate);
+            carQuery.find({
+                success: function (cars) {
+                    //update all car mileage
+                    for (var i = 0; i < cars.length; i++) {
+                        var car = cars[i];
+                        var mileage = car.get("baseMileage") + mileageAddition; // add baseMileage
 
-                Parse.Object.saveAll(cars, {
-                    success: function(data){
-                        console.log("autoMileageUpdate Success");
-                        status.success("Mileage for cars saved");
-
-                    },
-                    error: function(error){
-                        console.error("Error updating mileage from autoMileageUpdate: ", error);
-                        status.error("Mileage for cars not saved");
+                        car.set("baseMileage", mileage);
+                        car.set("totalMileage", mileage);
                     }
-                });
 
-            },
-            error: function (error){
-                console.error("Could not find cars updated before ", weekAgoDate);
-                console.error("Error: ", error);
-            }
+                    Parse.Object.saveAll(cars, {
+                        success: function(data){
+                            console.log("autoMileageUpdate Success");
+                            status.success("Mileage for cars saved");
+
+                        },
+                        error: function(error){
+                            console.error("Error updating mileage from autoMileageUpdate: ", error);
+                            status.error("Mileage for cars not saved");
+                        }
+                    });
+
+                },
+                error: function (error){
+                    console.error("Could not find cars updated before ", weekAgoDate);
+                    console.error("Error: ", error);
+                }
+            });
         });
 
 });
