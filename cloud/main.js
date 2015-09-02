@@ -458,6 +458,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     console.log("Starting carServiceUpdateJob");
     //save mileage in old cloud function and run update background job here
     var carsBatch = [] // cars array to batch save
+    var count = 0
     var query = new Parse.Query("Car");
     // 1 Day Ago: Date
     var d = new Date();
@@ -470,27 +471,15 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             console.log("found cars: ");
             console.log(cars.toString());
 
-            for (var i = 0; i < cars.length; i++) {
+            count = cars.length;
+
+            for (var i = 0; i < count; i++) {
 
                 var car = cars[i];
                 console.log(car.get("make").toString());
 
                 foundCar(car);
             }
-
-            //Batch save cars
-            Parse.Object.saveAll(carsBatch, {
-                success: function(data){
-                    console.log(carsBatch);
-                    console.log("carServiceUpdateJob Success");
-                    status.success("Services for cars saved");
-
-                },
-                error: function(error){
-                    console.error("carServiceUpdateJob Error: ", error);
-                    status.error("carServiceUpdateJob saveAll Error");
-                }
-            });
 
         },
         error: function (error){
@@ -510,6 +499,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
         // making a request to Edmunds for makeModelYearId
         console.log('making request to Edmunds');
+
         Parse.Cloud.httpRequest({
             url: EDMUNDS_API.requestPaths.makeModelYearId(
                 car.get('make'),
@@ -520,7 +510,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             success: function (results) {
 
                 var carMakeModelYearId = JSON.parse(results.text).id;
-
+                console.log(carMakeModelYearId.toString());
                 Parse.Cloud.httpRequest({
 
                     url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
@@ -559,7 +549,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
     var loadedEdmundsServices = function (edmundsServices, car) {
 
-        var serviceStack = []
+        var serviceStack = [];
         // looping through all the services
         var counter = 0; // this counter is async but using i isn't.
         for (var i = 0; i < edmundsServices.length; i++) {
@@ -682,6 +672,22 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
         car.set("servicesDue", servicesDue);
         carsBatch.push(car); // push new car into array for batch save
+
+        if (carsBatch.length == count){
+            //Batch save cars
+            Parse.Object.saveAll(carsBatch, {
+                success: function(data){
+                    console.log(carsBatch);
+                    console.log("carServiceUpdateJob Success");
+                    status.success("Services for cars saved");
+
+                },
+                error: function(error){
+                    console.error("carServiceUpdateJob Error: ", error);
+                    status.error("carServiceUpdateJob saveAll Error");
+                }
+            });
+        }
 
     }; //END
 
