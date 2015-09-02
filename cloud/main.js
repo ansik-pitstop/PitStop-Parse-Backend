@@ -510,8 +510,8 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
         console.log(car.make().toString());
 
         // making a request to Edmunds for makeModelYearId
+        console.log('making request to Edmunds');
         Parse.Cloud.httpRequest({
-            console.log('making request to Edmunds');
             url: EDMUNDS_API.requestPaths.makeModelYearId(
                 car.get('make'),
                 car.get('model'),
