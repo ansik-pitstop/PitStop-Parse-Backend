@@ -525,7 +525,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                     error: function (error) {
                         console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
                         console.error(error);
-                        status.error("Error, could not get services from Edmunds: ", error);
+                        
                     }
 
                 });
@@ -535,7 +535,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             error: function (error) {
                 console.error("Could not get carMakeModelYearId from Edmunds");
                 console.error("ERROR: ", error);
-                status.error("Error, could not get carMakeModelYearId : ", error);
+
             }
 
         });
