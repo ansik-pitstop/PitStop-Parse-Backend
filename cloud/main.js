@@ -441,7 +441,6 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
             error: function (error){
                 console.error("Could not find cars updated before ", weekAgoDate);
                 console.error("Error: ", error);
-            }}
-
-    }
+            }
+        }
 );
