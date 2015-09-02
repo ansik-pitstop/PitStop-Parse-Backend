@@ -507,7 +507,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var foundCar = function (car) {
 
         //var car = loadedCar;
-        console.log(car.make().toString());
+        console.log(car.get('make').toString());
 
         // making a request to Edmunds for makeModelYearId
         console.log('making request to Edmunds');
