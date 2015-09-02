@@ -420,12 +420,12 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
         carQuery.find({
             success: function (cars) {
                 //update all car mileage
-                status.message(cars);
+                status.message(cars.toString());
 
                 for (var i = 0; i < cars.length; i++) {
 
                     var car = cars[i];
-                    status.message(car);
+                    status.message(car.toString());
                     var mileage = car.get("baseMileage") + mileageAddition; // add baseMileage
 
                     car.set("baseMileage", mileage);
