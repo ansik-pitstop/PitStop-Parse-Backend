@@ -408,12 +408,12 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 
         Parse.Cloud.useMasterKey;
         //var config = Parse.Config.current();
-        var mileageAddition = (parseInt(request.params.biWeeklyAverageMiles) / 10);
+        var mileageAddition = (parseInt(request.params.biWeeklyAverageMiles) / 2);
         status.message("mileage addition "+mileageAddition);
         var carQuery = new Parse.Query("Car");
         // Week Ago: Date
         var d = new Date();
-        var time = (2 * 24 * 3600 * 1000);
+        var time = (7 * 24 * 3600 * 1000);
         var weekAgoDate = new Date(d.getTime() - (time));
         // find cars that haven't been updated in at least a week
         carQuery.greaterThanOrEqualTo( "updatedAt", weekAgoDate);
