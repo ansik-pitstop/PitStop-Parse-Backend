@@ -519,7 +519,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
             success: function (results) {
 
-                carMakeModelYearId = JSON.parse(results.text).id;
+                var carMakeModelYearId = JSON.parse(results.text).id;
 
                 Parse.Cloud.httpRequest({
 
