@@ -478,7 +478,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 var car = cars[i];
                 console.log(car.get("make").toString());
 
-                foundCar(car);
+                setTimeout(foundCar(car), 500);
             }
 
         },
