@@ -479,26 +479,16 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 var car = cars[i];
                 console.log(car.get("make").toString());
 
-                var delayUntil;
-                var delayPromise;
-
-                var _delay = function () {
-                    if (Date.now() >= delayUntil) {
-                        delayPromise.resolve();
-                        return;
-                    } else {
-                        process.nextTick(_delay);
-                    }
-                }
-
-                var delay = function(delayTime) {
-                    delayUntil = Date.now() + delayTime;
-                    delayPromise = new Parse.Promise();
-                    _delay();
-                    return delayPromise;
+                var delay = function(millis) {
+                    var promise = new Parse.Promise();
+                    setTimeout(function() {
+                        promise.resolve();
+                    }, millis);
+                    return promise;
                 };
 
-                delay(1000).then(foundCar(car));
+                delay(500).then(foundCar(car));
+
             }
 
         },
