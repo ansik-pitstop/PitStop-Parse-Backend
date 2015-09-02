@@ -467,8 +467,8 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     query.lessThanOrEqualTo( "updatedAt", dayAgoDate);
     query.find({
         success: function(cars){
-            status.message("found cars: ");
-            status.message(cars.toString());
+            console.log("found cars: ");
+            console.log(cars.toString());
 
             for (var i = 0; i < cars.length; i++) {
 
@@ -481,6 +481,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             //Batch save cars
             Parse.Object.saveAll(carsBatch, {
                 success: function(data){
+                    console.log(carsBatch);
                     console.log("carServiceUpdateJob Success");
                     status.success("Services for cars saved");
 
