@@ -525,7 +525,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                     error: function (error) {
                         console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
                         console.error(error);
-                        
+
                     }
 
                 });
@@ -591,7 +591,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                                 if (loadedService.get("intervalMileage") !== 1) {
                                     if (loadedService.get("priority") == 4){
                                         //high priority items
-                                        var currentIntervalMileage = carMileage - history.get("mileage");
+                                        var currentIntervalMileage = car.get("mileage") - history.get("mileage");
 
                                         if (currentIntervalMileage - loadedService.get("intervalMileage") > 500 ||
                                             loadedService.get("intMileage") - currentIntervalMileage < 500)  {
@@ -601,7 +601,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                                         }
                                     }else{
                                         //suggested service
-                                        var currentIntervalMileage = carMileage % loadedService.get("intervalMileage");
+                                        var currentIntervalMileage = car.get("mileage") % loadedService.get("intervalMileage");
 
                                         if (currentIntervalMileage < 1000){
                                             serviceStack.push(loadedService);
