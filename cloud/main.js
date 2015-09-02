@@ -455,6 +455,7 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 });
 
 Parse.Cloud.job("carServiceUpdateJob", function(request, status){
+    console.log("Starting carServiceUpdateJob");
     //save mileage in old cloud function and run update background job here
     var carsBatch = [] // cars array to batch save
     var query = new Parse.Query("Car");
@@ -474,7 +475,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 var car = cars[i];
                 status.message(car.toString());
 
-                foundCar(cars)
+                foundCar(cars);
             }
 
             //Batch save cars
@@ -486,14 +487,14 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 },
                 error: function(error){
                     console.error("carServiceUpdateJob Error: ", error);
-                    status.error("carServiceUpdateJob Error");
+                    status.error("carServiceUpdateJob saveAll Error");
                 }
             });
 
         },
         error: function (error){
             console.error("Error: ", error);
-            status.error("Error: ", error);
+            status.error("Error, did not find cars: ", error);
         }
     });
 
@@ -504,7 +505,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var foundCar = function (loadedCar) {
 
         // assigning the loadedCar to global car
-        car = loadedCar;
+        var car = loadedCar;
 
         // making a request to Edmunds for makeModelYearId
         Parse.Cloud.httpRequest({
@@ -524,15 +525,16 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                     url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
 
                     success: function (results) {
-                        edmundsServices = JSON.parse(results.text).actionHolder;
+                        var edmundsServices = JSON.parse(results.text).actionHolder;
                         console.log("Calling loadedEdmundsServices with: ");
                         console.log(edmundsServices);
-                        loadedEdmundsServices();
+                        loadedEdmundsServices(edmundsServices, car);
                     },
 
                     error: function (error) {
                         console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
                         console.error(error);
+                        status.error("Error, could not get services from Edmunds: ", error);
                     }
 
                 });
@@ -542,6 +544,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             error: function (error) {
                 console.error("Could not get carMakeModelYearId from Edmunds");
                 console.error("ERROR: ", error);
+                status.error("Error, could not get carMakeModelYearId : ", error);
             }
 
         });
@@ -553,8 +556,9 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
      services from edmunds
      */
 
-    var loadedEdmundsServices = function () {
+    var loadedEdmundsServices = function (edmundsServices, car) {
 
+        var serviceStack = []
         // looping through all the services
         var counter = 0; // this counter is async but using i isn't.
         for (var i = 0; i < edmundsServices.length; i++) {
@@ -654,7 +658,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     /*
      This gets called  when all due services are added to the stack
      */
-    var serviceStackIsFull = function () {
+    var serviceStackIsFull = function (serviceStack, car) {
         console.log("Service Stack is Full");
         console.log(serviceStack);
         //return subset of services by priority
@@ -671,18 +675,17 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
         if (prioritySum > 5) {
             //save new notification
-            saveNotification(serviceStack);
+            saveNotification(serviceStack, car);
             car.set("serviceDue", true);
         }
 
         car.set("servicesDue", servicesDue);
-        car.set("totalMileage", carMileage);
         carsBatch.push(car); // push new car into array for batch save
 
     }; //END
 
     //saves new notifications
-    var saveNotification = function (servicesDue) {
+    var saveNotification = function (servicesDue, car) {
 
         //set notifications object
         var notificationCount = servicesDue.length;
@@ -704,7 +707,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
         var notificationTitle =  car.get("make") + " " + car.get("model") + " has " + "services due ";
 
         notificationToSave.set("content", notificationContent);
-        notificationToSave.set("scanId", scan.id);
+        //notificationToSave.set("scanId", scan.id);
         notificationToSave.set("title", notificationTitle);
         notificationToSave.set("toId", car.get("owner"));
         notificationToSave.set("carId", car.id);
