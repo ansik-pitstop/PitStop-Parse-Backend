@@ -473,7 +473,8 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             for (var i = 0; i < cars.length; i++) {
 
                 var car = cars[i];
-                status.message(car.toString());
+                console.log(car.toString());
+                console.log(Object.keys(car).toString());
 
                 foundCar(cars);
             }
@@ -503,14 +504,14 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
      This function is called when the car associated with the
      current scan is found
      */
-    var foundCar = function (loadedCar) {
+    var foundCar = function (car) {
 
-        // assigning the loadedCar to global car
-        var car = loadedCar;
+        //var car = loadedCar;
+        console.log(car.make().toString());
 
         // making a request to Edmunds for makeModelYearId
         Parse.Cloud.httpRequest({
-
+            console.log('making request to Edmunds');
             url: EDMUNDS_API.requestPaths.makeModelYearId(
                 car.get('make'),
                 car.get('model'),
