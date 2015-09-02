@@ -219,7 +219,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         console.error("ERROR: ", error);
         }
 
-        }); */
+        });
     };
 
   /*
