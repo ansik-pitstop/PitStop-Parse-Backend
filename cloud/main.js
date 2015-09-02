@@ -466,6 +466,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var dayAgoDate = new Date(d.getTime() - (time));
     // find cars that were updated in last day
     query.greaterThanOrEqualTo( "updatedAt", dayAgoDate);
+    query.descending("updatedAt");
     query.find({
         success: function(cars){
             console.log("found cars: ");
@@ -478,7 +479,26 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 var car = cars[i];
                 console.log(car.get("make").toString());
 
-                setTimeout(foundCar(car), 500);
+                var delayUntil;
+                var delayPromise;
+
+                var _delay = function () {
+                    if (Date.now() >= delayUntil) {
+                        delayPromise.resolve();
+                        return;
+                    } else {
+                        process.nextTick(_delay);
+                    }
+                }
+
+                var delay = function(delayTime) {
+                    delayUntil = Date.now() + delayTime;
+                    delayPromise = new Parse.Promise();
+                    _delay();
+                    return delayPromise;
+                };
+
+                delay(1000).then(foundCar(car));
             }
 
         },
