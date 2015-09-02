@@ -417,7 +417,7 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
         var time = (7 * 24 * 3600 * 1000);
         var weekAgoDate = new Date(d.getTime() - (time));
         // find cars that haven't been updated in at least a week
-        query.greaterThanOrEqualTo( "updatedAt", weekAgoDate);
+        query.lessThanOrEqualTo( "updatedAt", weekAgoDate);
         query.find({
             success: function (cars) {
                 //update all car mileage
@@ -461,10 +461,10 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var query = new Parse.Query("Car");
     // 1 Day Ago: Date
     var d = new Date();
-    var time = (24 * 3600 * 1000);
+    var time = (2 * 24 * 3600 * 1000);
     var dayAgoDate = new Date(d.getTime() - (time));
     // find cars that were updated in last day
-    query.lessThanOrEqualTo( "updatedAt", dayAgoDate);
+    query.greaterThanOrEqualTo( "updatedAt", dayAgoDate);
     query.find({
         success: function(cars){
             console.log("found cars: ");
