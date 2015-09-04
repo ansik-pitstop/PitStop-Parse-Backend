@@ -664,22 +664,14 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
         car.set("servicesDue", servicesDue);
         carsBatch.push(car); // push new car into array for batch save
-
-        if (carsBatch.length == count){
-            //Batch save cars
-            Parse.Object.saveAll(carsBatch, {
-                success: function(data){
-                    console.log(carsBatch);
-                    console.log("carServiceUpdateJob Success");
-                    status.success("Services for cars saved");
-
-                },
-                error: function(error){
-                    console.error("carServiceUpdateJob Error: ", error);
-                    status.error("carServiceUpdateJob saveAll Error");
-                }
-            });
-        }
+        Parse.Object.save(car, {
+           success: function(data){
+               status.success("car saved");
+           },
+            error: function(error){
+                status.error("car not saved", error);
+            }
+        });
 
     }; //END
 
