@@ -79,15 +79,38 @@ Parse.Cloud.afterSave("Car", function(request){
 
 Parse.Cloud.afterSave("Scan", function(request) {
 
-  // getting the scan object
-  var scan = request.object;
+    // getting the scan object
+    var scan = request.object;
 
-  // stopping the function if not required
-  if (scan.get("runAfterSave") !== true) {
+    // stopping the function if not required
+    if (scan.get("runAfterSave") !== true) {
     return;
-  }
+    }
+    
+    Parse.Cloud.httpRequest({
+        method: "POST",
+        url: "https://api.parse.com/1/jobs/carServiceUpdate",
+        headers: {
+            "X-Parse-Application-Id": "NdSgPCykUoMT6jQd35LVYjf4MjayAL1PcSvSCxUo",
+            "X-Parse-Master-Key": "49F8EaINtWQlpPKTTx4oEiuRn2VfgayyNzy4cpLr",
+            "Content-Type": "application/json"
+        },
+        body: {
+            scannerId: scan.get("scannerId"),
+            mileage: scan.get("mileage"),
+            PIDs: scan.get("PIDs"),
+            id: scan.id
+        },
+        success: function(httpResponse) {
+            console.log(httpResponse);
+        },
+        error: function(error) {
+            console.log("ERROR");
+        }
+    });
 
   //run cloud function
+  /*
   Parse.Cloud.run("carServicesUpdate", { //run with carServicesUpdate
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
@@ -103,7 +126,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
         console.error(error);
       }
     }
-);
+);*/
 
 });
 
@@ -136,7 +159,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 });
 
-Parse.Cloud.define("carServicesUpdate", function(request, status) {
+Parse.Cloud.job("carServicesUpdate", function(request, status) { //define/job
   //request object is scan
   scan = request.params;
 
