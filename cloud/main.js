@@ -86,7 +86,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     if (scan.get("runAfterSave") !== true) {
     return;
     }
-    
+    /*
     Parse.Cloud.httpRequest({
         method: "POST",
         url: "https://api.parse.com/1/jobs/carServiceUpdate",
@@ -107,10 +107,10 @@ Parse.Cloud.afterSave("Scan", function(request) {
         error: function(error) {
             console.log("ERROR");
         }
-    });
+    });*/
 
   //run cloud function
-  /*
+
   Parse.Cloud.run("carServicesUpdate", { //run with carServicesUpdate
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
@@ -126,7 +126,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
         console.error(error);
       }
     }
-);*/
+);
 
 });
 
