@@ -456,58 +456,27 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
 
 Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     console.log("Starting carServiceUpdateJob");
-    //save mileage in old cloud function and run update background job here
-    var carsBatch = [] // cars array to batch save
-    var count = 0
+
+    //update carServices for one car
+
     var query = new Parse.Query("Car");
-    // 1 Day Ago: Date
-    var d = new Date();
-    var time = (2 * 24 * 3600 * 1000);
-    var dayAgoDate = new Date(d.getTime() - (time));
-    // find cars that were updated in last day
-
-    var delayUntil;
-    var delayPromise;
-
-    var _delay = function () {
-        if (Date.now() >= delayUntil) {
-            delayPromise.resolve();
-            return;
-        } else {
-            process.nextTick(_delay);
-        }
-    }
-
-    var delay = function(delayTime) {
-        delayUntil = Date.now() + delayTime;
-        delayPromise = new Parse.Promise();
-        _delay();
-        return delayPromise;
-    };
+    var car = null;
 
 
-    query.greaterThanOrEqualTo( "updatedAt", dayAgoDate);
-    query.descending("updatedAt");
+    query.EqualTo( "objectId", request.params.carId);
     query.find({
         success: function(cars){
-            console.log("found cars: ");
-            console.log(cars.toString());
+            console.log("found car: ");
 
             count = cars.length;
 
-            for (var i = 0; i < count; i++) {
-
-                var car = cars[i];
-                console.log(car.get("make").toString());
-
-                delay(501).then(foundCar(car).then(status.success("Services for cars saved")));
-
-            }
-
+            car = cars[0];
+            console.log(car.get("make"));
+            foundCar(car)
         },
         error: function (error){
             console.error("Error: ", error);
-            status.error("Error, did not find cars: ", error);
+            status.error("Error, did not find car: ", error);
         }
     });
 
@@ -518,7 +487,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var foundCar = function (car) {
 
         //var car = loadedCar;
-        console.log(car.get('make').toString());
+        console.log(car.get('make'));
 
         // making a request to Edmunds for makeModelYearId
         console.log('making request to Edmunds');
@@ -571,7 +540,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
      */
 
     var loadedEdmundsServices = function (edmundsServices, car) {
-
+        console.log("loaded edmunds services for: "+car.get('make'));
         var serviceStack = [];
         // looping through all the services
         var counter = 0; // this counter is async but using i isn't.
@@ -702,7 +671,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 success: function(data){
                     console.log(carsBatch);
                     console.log("carServiceUpdateJob Success");
-
+                    status.success("Services for cars saved");
 
                 },
                 error: function(error){
