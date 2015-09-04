@@ -463,7 +463,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     var car = null;
 
 
-    query.EqualTo( "objectId", request.params.carId);
+    query.equalTo( "objectId", request.params.carId);
     query.find({
         success: function(cars){
             console.log("found car: ");
