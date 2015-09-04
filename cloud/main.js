@@ -663,7 +663,6 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
         }
 
         car.set("servicesDue", servicesDue);
-        carsBatch.push(car); // push new car into array for batch save
         Parse.Object.save(car, {
            success: function(data){
                status.success("car saved");
