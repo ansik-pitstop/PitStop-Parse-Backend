@@ -159,7 +159,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 });
 
-Parse.Cloud.job("carServicesUpdate", function(request, status) { //define/job
+Parse.Cloud.define("carServicesUpdate", function(request, status) {
   //request object is scan
   scan = request.params;
 
