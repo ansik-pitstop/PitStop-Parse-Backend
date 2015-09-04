@@ -355,7 +355,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     console.log("Service Stack is Full");
     console.log(serviceStack);
     //return subset of services by priority
-    //serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
+    serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
 
     var servicesDue = car.get("servicesDue");
     var prioritySum = 0;
