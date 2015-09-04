@@ -556,7 +556,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                     if (results.length === 0) {
                         counter++;
                         if (i === counter) {
-                            serviceStackIsFull();
+                            serviceStackIsFull(serviceStack);
                         }
                         return;
                     }
@@ -605,7 +605,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
                             counter++;
                             if (i === counter) {
-                                serviceStackIsFull();
+                                serviceStackIsFull(serviceStack);
                             }
 
                         },
@@ -613,7 +613,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
 
                             counter++;
                             if (i === counter) {
-                                serviceStackIsFull();
+                                serviceStackIsFull(serviceStack);
                             }
 
                             console.error(error);
@@ -641,7 +641,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
     /*
      This gets called  when all due services are added to the stack
      */
-    var serviceStackIsFull = function (serviceStack, car) {
+    var serviceStackIsFull = function (serviceStack) {
         console.log("Service Stack is Full");
         console.log(serviceStack);
         //return subset of services by priority
