@@ -500,7 +500,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 var car = cars[i];
                 console.log(car.get("make").toString());
 
-                delay(501).then(foundCar(car));
+                delay(501).then(foundCar(car).then(status.success("Services for cars saved")));
 
             }
 
@@ -702,7 +702,7 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
                 success: function(data){
                     console.log(carsBatch);
                     console.log("carServiceUpdateJob Success");
-                    status.success("Services for cars saved");
+
 
                 },
                 error: function(error){
