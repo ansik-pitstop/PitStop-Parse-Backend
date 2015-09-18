@@ -142,12 +142,14 @@ Parse.Cloud.afterSave("Notification", function(request) {
           pushQuery.equalTo('userId', notification.get("toId"));
 
           Parse.Push.send({
-            where: pushQuery,
-            data:{
-              //data for push notification
-              alert: notification.get("content"), //to enable ios push
-              title: notification.get("title")
-            }
+              where: pushQuery,
+              badge: "Increment",
+              data:{
+                //data for push notification
+                alert: notification.get("content"), //to enable ios push
+                title: notification.get("title")
+
+              }
           }, {
             success: function(){
               //success, destroy notification
@@ -397,7 +399,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     var Notification = Parse.Object.extend("Notification");
     var notificationToSave = new Notification();
 
-    var notificationContent = car.get("make") + " " + car.get("model") + " has the following services due: ";
+    var notificationContent = car.get("make") + " " + car.get("model") + " has "+ servicesDue.length +" services due";
     /*
     for (var i = 0; i < servicesDue.length; i++){
           //add services to string
