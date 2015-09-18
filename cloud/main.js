@@ -79,15 +79,38 @@ Parse.Cloud.afterSave("Car", function(request){
 
 Parse.Cloud.afterSave("Scan", function(request) {
 
-  // getting the scan object
-  var scan = request.object;
+    // getting the scan object
+    var scan = request.object;
 
-  // stopping the function if not required
-  if (scan.get("runAfterSave") !== true) {
+    // stopping the function if not required
+    if (scan.get("runAfterSave") !== true) {
     return;
-  }
+    }
+    /*
+    Parse.Cloud.httpRequest({
+        method: "POST",
+        url: "https://api.parse.com/1/jobs/carServiceUpdate",
+        headers: {
+            "X-Parse-Application-Id": "NdSgPCykUoMT6jQd35LVYjf4MjayAL1PcSvSCxUo",
+            "X-Parse-Master-Key": "49F8EaINtWQlpPKTTx4oEiuRn2VfgayyNzy4cpLr",
+            "Content-Type": "application/json"
+        },
+        body: {
+            scannerId: scan.get("scannerId"),
+            mileage: scan.get("mileage"),
+            PIDs: scan.get("PIDs"),
+            id: scan.id
+        },
+        success: function(httpResponse) {
+            console.log(httpResponse);
+        },
+        error: function(error) {
+            console.log("ERROR");
+        }
+    });*/
 
   //run cloud function
+
   Parse.Cloud.run("carServicesUpdate", { //run with carServicesUpdate
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
@@ -119,12 +142,14 @@ Parse.Cloud.afterSave("Notification", function(request) {
           pushQuery.equalTo('userId', notification.get("toId"));
 
           Parse.Push.send({
-            where: pushQuery,
-            data:{
-              //data for push notification
-              alert: notification.get("content"),
-              title: notification.get("title")
-            }
+              where: pushQuery,
+              badge: "Increment",
+              data:{
+                //data for push notification
+                alert: notification.get("content"), //to enable ios push
+                title: notification.get("title")
+
+              }
           }, {
             success: function(){
               //success, destroy notification
@@ -165,30 +190,32 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   This function is called when the car associated with the
   current scan is found
   */
-  var foundCar = function (loadedCar) {
+    var foundCar = function (loadedCar) {
 
-    // assigning the loadedCar to global car
-    car = loadedCar;
-    var scanMileage = scan["mileage"];
+        // assigning the loadedCar to global car
+        car = loadedCar;
+        var scanMileage = scan["mileage"];
 
-    // setting the car mileage
-    if (scan["PIDs"] === undefined) {
-    carMileage = scanMileage;
-    } else {
-    carMileage = scanMileage + car.get("baseMileage");
-    }
+        // setting the car mileage
+        if (scan["PIDs"] === undefined) {
+        carMileage = scanMileage;
+        } else {
+        carMileage = scanMileage + car.get("baseMileage");
+        }
+        car.set("totalMileage", carMileage);
+        car.save();
 
 
-    // making a request to Edmunds for makeModelYearId
-    Parse.Cloud.httpRequest({
+        // making a request to Edmunds for makeModelYearId
+        Parse.Cloud.httpRequest({
 
-      url: EDMUNDS_API.requestPaths.makeModelYearId(
-      car.get('make'),
-      car.get('model'),
-      car.get('year')
-      ),
+        url: EDMUNDS_API.requestPaths.makeModelYearId(
+        car.get('make'),
+        car.get('model'),
+        car.get('year')
+        ),
 
-      success: function (results) {
+        success: function (results) {
 
         carMakeModelYearId = JSON.parse(results.text).id;
 
@@ -210,16 +237,15 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
         });
 
-      },
+        },
 
-      error: function (error) {
+        error: function (error) {
         console.error("Could not get carMakeModelYearId from Edmunds");
         console.error("ERROR: ", error);
-      }
+        }
 
-    });
-
-  };
+        });
+    };
 
   /*
   This function gets called when the program is done loading
@@ -331,7 +357,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     console.log("Service Stack is Full");
     console.log(serviceStack);
     //return subset of services by priority
-    //serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
+    serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
 
     var servicesDue = car.get("servicesDue");
     var prioritySum = 0;
@@ -353,12 +379,12 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     car.save(null, {
       success: function (savedCar) {
         console.log("car saved");
-        status.success("car saved"); // success for cloud function
+        response.success("car saved"); // success for cloud function
       },
       error: function (saveError) {
         console.log("car not saved");
         console.error(saveError);
-        status.error("car not saved"); //failure for cloud function
+        response.error("car not saved"); //failure for cloud function
       }
     });
 
@@ -373,16 +399,19 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     var Notification = Parse.Object.extend("Notification");
     var notificationToSave = new Notification();
 
-    var notificationContent = car.get("make") + " " + car.get("model") + " has the following services due: ";
-
+    var notificationContent = car.get("make") + " " + car.get("model") + " has "+ servicesDue.length +" services due";
+    /*
     for (var i = 0; i < servicesDue.length; i++){
-      //add services to string
-      var service = servicesDue[i];
-      notificationContent += service.get("action") + " " + service.get("item");//description...
-      if (i < servicesDue.length - 1){
-        notificationContent += ", ";
-      }
-    }
+          //add services to string
+        if (notificationContent.length < 60){
+            var service = servicesDue[i];
+            notificationContent += service.get("action") + " " + service.get("item");//description...
+            if (i < servicesDue.length - 1){
+                notificationContent += ", ";
+            }
+        }
+
+    }*/
 
     var notificationTitle =  car.get("make") + " " + car.get("model") + " has " + "services due ";
 
@@ -410,14 +439,14 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
         //var config = Parse.Config.current();
         var mileageAddition = (parseInt(request.params.biWeeklyAverageMiles) / 2);
         status.message("mileage addition "+mileageAddition);
-        var carQuery = new Parse.Query("Car");
+        var query = new Parse.Query("Car");
         // Week Ago: Date
         var d = new Date();
         var time = (7 * 24 * 3600 * 1000);
         var weekAgoDate = new Date(d.getTime() - (time));
         // find cars that haven't been updated in at least a week
-        carQuery.greaterThanOrEqualTo( "updatedAt", weekAgoDate);
-        carQuery.find({
+        query.lessThanOrEqualTo( "updatedAt", weekAgoDate);
+        query.find({
             success: function (cars) {
                 //update all car mileage
                 status.message(cars.toString());
@@ -450,5 +479,269 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
                 console.error("Error: ", error);
             }
         });
+
+});
+
+Parse.Cloud.job("carServiceUpdateJob", function(request, status){
+    console.log("Starting carServiceUpdateJob");
+
+    //update carServices for one car
+
+    var query = new Parse.Query("Car");
+    var car = null;
+
+
+    query.equalTo( "objectId", request.params.carId);
+    query.find({
+        success: function(cars){
+            console.log("found car: ");
+
+            count = cars.length;
+
+            car = cars[0];
+            console.log(car.get("make"));
+            foundCar(car)
+        },
+        error: function (error){
+            console.error("Error: ", error);
+            status.error("Error, did not find car: ", error);
+        }
+    });
+
+    /*
+     This function is called when the car associated with the
+     current scan is found
+     */
+    var foundCar = function (car) {
+
+        //var car = loadedCar;
+        console.log(car.get('make'));
+
+        // making a request to Edmunds for makeModelYearId
+        console.log('making request to Edmunds');
+
+        Parse.Cloud.httpRequest({
+            url: EDMUNDS_API.requestPaths.makeModelYearId(
+                car.get('make'),
+                car.get('model'),
+                car.get('year')
+            ),
+
+            success: function (results) {
+
+                var carMakeModelYearId = JSON.parse(results.text).id;
+                console.log(carMakeModelYearId.toString());
+                Parse.Cloud.httpRequest({
+
+                    url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
+
+                    success: function (results) {
+                        var edmundsServices = JSON.parse(results.text).actionHolder;
+                        console.log("Calling loadedEdmundsServices with: ");
+                        console.log(edmundsServices);
+                        loadedEdmundsServices(edmundsServices, car);
+                    },
+
+                    error: function (error) {
+                        console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
+                        console.error(error);
+
+                    }
+
+                });
+
+            },
+
+            error: function (error) {
+                console.error("Could not get carMakeModelYearId from Edmunds");
+                console.error("ERROR: ", error);
+
+            }
+
+        });
+
+    };
+
+    /*
+     This function gets called when the program is done loading
+     services from edmunds
+     */
+
+    var loadedEdmundsServices = function (edmundsServices, car) {
+        console.log("loaded edmunds services for: "+car.get('make'));
+        var serviceStack = [];
+        // looping through all the services
+        var counter = 0; // this counter is async but using i isn't.
+        for (var i = 0; i < edmundsServices.length; i++) {
+
+            var serviceQuery = new Parse.Query("Service");
+
+            serviceQuery.equalTo("action", edmundsServices[i].action || null);
+            serviceQuery.equalTo("item", edmundsServices[i].item || null);
+            serviceQuery.find({
+                success: function (results) {
+
+                    if (results.length === 0) {
+                        counter++;
+                        if (i === counter) {
+                            serviceStackIsFull(serviceStack);
+                        }
+                        return;
+                    }
+
+                    // getting the first service found
+                    var loadedService = results[0];
+                    // getting the edmunds service from the for loop.
+                    var toCheckService = edmundsServices[i];
+
+                    // quering for service history
+                    var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
+                    ServiceHistoryQuery.equalTo("serviceId", loadedService.get("serviceId"));
+                    ServiceHistoryQuery.equalTo("carId", car.id);
+                    ServiceHistoryQuery.find({
+                        success: function (serviceHistoryArray) {
+
+                            // if no history found
+                            if (serviceHistoryArray.length === 0) {
+                                console.log("NO HISTORY FOUND FOR " + loadedService.get("serviceId") + " || " + counter + " - " + edmundsServices.length);
+                                serviceStack.push(loadedService);
+                            } else {
+                                var history = serviceHistoryArray[serviceHistoryArray.length - 1];
+
+                                if (loadedService.get("intervalMileage") !== 1) {
+                                    if (loadedService.get("priority") == 4){
+                                        //high priority items
+                                        var currentIntervalMileage = car.get("mileage") - history.get("mileage");
+
+                                        if (currentIntervalMileage - loadedService.get("intervalMileage") > 500 ||
+                                            loadedService.get("intMileage") - currentIntervalMileage < 500)  {
+
+                                            console.log("HISTORY: " + history.get("mileage") + " ||||| INTERVAL: " + loadedService.get("intervalMileage"));
+                                            serviceStack.push(loadedService);
+                                        }
+                                    }else{
+                                        //suggested service
+                                        var currentIntervalMileage = car.get("mileage") % loadedService.get("intervalMileage");
+
+                                        if (currentIntervalMileage < 1000){
+                                            serviceStack.push(loadedService);
+                                        }
+                                    }
+                                }
+
+                            }
+
+                            counter++;
+                            if (i === counter) {
+                                serviceStackIsFull(serviceStack);
+                            }
+
+                        },
+                        error: function (error) {
+
+                            counter++;
+                            if (i === counter) {
+                                serviceStackIsFull(serviceStack);
+                            }
+
+                            console.error(error);
+
+                        }
+
+                    });
+
+                },
+                error: function (error) {
+
+                    console.error("Could not find a service with action and Item ");
+                    console.error("ERROR: ", error);
+
+                }
+            });
+        }
+
+
+        // just an event to be fired when the
+        // for loop is over.
+
+    };//END loadedEdmundsServices
+
+    /*
+     This gets called  when all due services are added to the stack
+     */
+    var serviceStackIsFull = function (serviceStack) {
+        console.log("Service Stack is Full");
+        console.log(serviceStack);
+        //return subset of services by priority
+        //serviceStack = serviceStack.sort(function(a,b){return b.get("priority")-a.get("priority")}).slice(0,5);
+
+        var servicesDue = car.get("servicesDue");
+        var prioritySum = 0;
+        for (var i = 0; i < serviceStack.length; i++) {
+            var service = serviceStack[i];
+            prioritySum += service.get("priority");
+            if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+        }
+        console.log(prioritySum);
+
+        if (prioritySum > 5) {
+            //save new notification
+            saveNotification(serviceStack, car);
+            car.set("serviceDue", true);
+        }
+
+        car.set("servicesDue", servicesDue);
+        car.save(null, {
+            success: function (savedCar) {
+                console.log("car saved");
+                status.success("car saved"); // success for cloud function
+            },
+            error: function (saveError) {
+                console.log("car not saved");
+                console.error(saveError);
+                status.error("car not saved"); //failure for cloud function
+            }
+        });
+
+    }; //END
+
+    //saves new notifications
+    var saveNotification = function (servicesDue, car) {
+
+        //set notifications object
+        var notificationCount = servicesDue.length;
+
+        var Notification = Parse.Object.extend("Notification");
+        var notificationToSave = new Notification();
+
+        var notificationContent = car.get("make") + " " + car.get("model") + " has the following services due: ";
+
+        for (var i = 0; i < servicesDue.length; i++){
+            //add services to string
+            var service = servicesDue[i];
+            notificationContent += service.get("action") + " " + service.get("item");//description...
+            if (i < servicesDue.length - 1){
+                notificationContent += ", ";
+            }
+        }
+
+        var notificationTitle =  car.get("make") + " " + car.get("model") + " has " + "services due ";
+
+        notificationToSave.set("content", notificationContent);
+        //notificationToSave.set("scanId", scan.id);
+        notificationToSave.set("title", notificationTitle);
+        notificationToSave.set("toId", car.get("owner"));
+        notificationToSave.set("carId", car.id);
+
+        notificationToSave.save(null, {
+            success: function(notificationToSave){
+                //saved
+            },
+            error: function(notificationToSave, error){
+                console.error("Error: " + error.code + " " + error.message);
+            }
+        });
+    };
+
 
 });
