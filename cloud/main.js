@@ -19,7 +19,50 @@ var EDMUNDS_API = {
      }
    }
 
- };
+};
+
+var edmundsServiceRequest = function(make, model, year, cb){
+    // making a request to Edmunds for makeModelYearId
+    Parse.Cloud.httpRequest({
+
+        url: EDMUNDS_API.requestPaths.makeModelYearId(
+            make,
+            model,
+            year
+        ),
+
+        success: function (results) {
+
+            carMakeModelYearId = JSON.parse(results.text).id;
+
+            Parse.Cloud.httpRequest({
+
+                url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
+
+                success: function (results) {
+                    var edmundsServices = JSON.parse(results.text).actionHolder;
+                    console.log("Loaded EdmundsServices: ");
+                    console.log(edmundsServices);
+                    cb(edmundsServices)
+                },
+
+                error: function (error) {
+                    console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
+                    console.error(error);
+
+                }
+
+            });
+
+        },
+
+        error: function (error) {
+            console.error("Could not get carMakeModelYearId from Edmunds");
+            console.error("ERROR: ", error);
+        }
+
+    });
+}
 
 /*
  
@@ -238,18 +281,17 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         carMileage = scanMileage + car.get("baseMileage");
         }
         car.set("totalMileage", carMileage);
-        car.save();
 
         //parse dtcs and create notification
         var dtcData = scan["DTCs"];
 
         if ( dtcData !== undefined && dtcData !== ""){
 
+        car.set("storedDTCs", dtcData);
             var dtcs = dtcData.split(",");
 
             for (var i = 0; i < dtcs.length; i++){
-                var dtc = P+dtcs[i];
-
+                //check for DTCs
                 var query = new Parse.Query("DTC");
                 query.equalTo("dtcCode", dtcs[i]);
                 query.find({
@@ -290,6 +332,10 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
             }
         }
+        //save car
+        car.save();
+        console.log("car saved")
+
 
 
         // making a request to Edmunds for makeModelYearId
