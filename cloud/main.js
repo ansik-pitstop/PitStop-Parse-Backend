@@ -1,8 +1,9 @@
 /*
  Constants + Config
  */
+var sendgrid = require("sendgrid");
 
- var EDMUNDS_API = {
+var EDMUNDS_API = {
 
    host: "api.edmunds.com",
    tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
@@ -86,6 +87,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     if (scan.get("runAfterSave") !== true) {
     return;
     }
+
     /*
     Parse.Cloud.httpRequest({
         method: "POST",
@@ -159,6 +161,39 @@ Parse.Cloud.afterSave("Notification", function(request) {
             }
           });
 
+    var userQuery = new Parse.Query(Parse.User);
+
+        userQuery.equalTo('objectId', notification.get("toId"));
+        userQuery.find({
+            success: function(userData){
+                //send notification email to users
+
+                var email = userData[0]["email"];
+                var name = userData[0]["name"];
+
+                sendgrid.initialize("ansik", "Ansik.23");
+
+                SendGrid.sendEmail({
+                    to: [email+" (mailto:"+email+")"],
+                    from: "yashin@ansik.ca (mailto:yashin@ansik.ca)",
+                    subject: notification.get("title"),
+                    text: notification.get("content"),
+                    replyto: "yashin@ansik.ca (mailto:yashin@ansik.ca)"
+                }).then(function(httpResponse) {
+                    console.log(httpResponse);
+                    response.success("Email sent");
+                },function(httpResponse) {
+                    console.error(httpResponse);
+                    response.error("error");
+                });
+
+            },
+            error: function(error){
+                console.error("Could not find user with objectId", notification.get("toId"));
+                console.error("ERROR: ", error);
+            }
+        });
+
 });
 
 Parse.Cloud.define("carServicesUpdate", function(request, status) {
@@ -204,6 +239,57 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         }
         car.set("totalMileage", carMileage);
         car.save();
+
+        //parse dtcs and create notification
+        var dtcData = scan["DTCs"];
+
+        if ( dtcData !== undefined && dtcData !== ""){
+
+            var dtcs = dtcData.split(",");
+
+            for (var i = 0; i < dtcs.length; i++){
+                var dtc = parseInt(dtcs[i]);
+
+                var query = new Parse.Query("DTC");
+                query.equalTo("dtcCode", dtcs[i]);
+                query.find({
+                    success: function (data) {
+                        var description = data[0]["description"];
+
+                        var Notification = Parse.Object.extend("Notification");
+                        var notificationToSave = new Notification();
+
+                        var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i]+": "+description;
+
+                        var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i];
+
+                        notificationToSave.set("content", notificationContent);
+                        notificationToSave.set("scanId", scan.id);
+                        notificationToSave.set("title", notificationTitle);
+                        notificationToSave.set("toId", car.get("owner"));
+                        notificationToSave.set("carId", car.id);
+
+                        notificationToSave.save(null, {
+                            success: function(notificationToSave){
+                                //saved
+                            },
+                            error: function(notificationToSave, error){
+                                console.error("Error: " + error.code + " " + error.message);
+                            }
+                        });
+
+                    },
+                    error: function (error) {
+                        console.error("Could not find the dtc with code: ", dtcs[i]);
+                        console.error("ERROR: ", error);
+                    }
+                });
+
+
+
+
+            }
+        }
 
 
         // making a request to Edmunds for makeModelYearId
