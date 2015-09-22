@@ -248,7 +248,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
             var dtcs = dtcData.split(",");
 
             for (var i = 0; i < dtcs.length; i++){
-                var dtc = parseInt(dtcs[i]);
+                var dtc = P+dtcs[i];
 
                 var query = new Parse.Query("DTC");
                 query.equalTo("dtcCode", dtcs[i]);
