@@ -215,22 +215,23 @@ Parse.Cloud.afterSave("Notification", function(request) {
                 var email = userData[0]["email"];
                 var name = userData[0]["name"];
 
+                /*
                 var sendgrid = require("sendgrid");
                 sendgrid.initialize("ansik", "Ansik.23");
 
                 sendgrid.sendEmail({
-                    to: [email+" (mailto:"+email+")"],
-                    from: "yashin@ansik.ca (mailto:yashin@ansik.ca)",
+                    to: [email],
+                    from: "yashin@ansik.ca",
                     subject: notification.get("title"),
                     text: notification.get("content"),
-                    replyto: "yashin@ansik.ca (mailto:yashin@ansik.ca)"
+                    replyto: "yashin@ansik.ca"
                 }).then(function(httpResponse) {
                     console.log(httpResponse);
                     response.success("Email sent");
                 },function(httpResponse) {
                     console.error(httpResponse);
                     response.error("error");
-                });
+                });*/
 
             },
             error: function(error){
@@ -286,14 +287,21 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
         //parse dtcs and create notification
         var dtcData = scan["DTCs"];
+        console.log("dtcs")
+        console.log(dtcData)
 
         if ( dtcData !== undefined && dtcData !== ""){
+            var dtcArray = car.get("storedDTCs")
 
-        car.set("storedDTCs", dtcData);
+
             var dtcs = dtcData.split(",");
 
             for (var i = 0; i < dtcs.length; i++){
                 //check for DTCs
+                if (dtcs[i] != ""){
+                    dtcArray.append(dtcs[i])
+                }
+
                 var query = new Parse.Query("DTC");
                 query.equalTo("dtcCode", dtcs[i]);
                 query.find({
@@ -337,6 +345,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
 
             }
+
+            car.set("storedDTCs", dtcArray);
+
         }
         //save car
         car.save();
