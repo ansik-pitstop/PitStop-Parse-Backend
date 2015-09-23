@@ -21,31 +21,6 @@ var EDMUNDS_API = {
 
 };
 
-var createEdmundsService = function(service, carObject){
-    eService = new Parse.Object("EdmundsService");
-
-    //set values from carObject
-    eService.set("make", carObject["make"]);
-    eService.set("model", carObject["model"]);
-    eService.set("year", carObject["year"]);
-    //set values from service
-    eService.set('edmundsId', service["id"]);
-    eService.set('engineCode', service["engineCode"]);
-    eService.set('transmissionCode', service["transmissionCode"]);
-    eService.set('intervalMileage', service["intervalMileage"]);
-    eService.set('intervalMonth', service["intervalMonth"]);
-    eService.set('frequency', service["frequency"]);
-    eService.set('action', service["action"]);
-    eService.set('item', service["item"]);
-    eService.set('itemDescription', service["itemDescription"]);
-    eService.set('laborUnits', service["laborUnits"]);
-    eService.set('partUnits', service["partUnits"]);
-    eService.set('driveType', service["driveType"]);
-    //eService.set('modelYear', service["modelYear"]); //edmunds web api string
-
-    return eService;
-}
-
 /*
  
  Car aftersave: load calibration services
@@ -224,6 +199,49 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 });
 
+Parse.Cloud.define("addEdmundsService", function(request, status) {
+
+    var createEdmundsService = function(service, carObject){
+        eService = new Parse.Object("EdmundsService");
+
+        //set values from carObject
+        eService.set("make", carObject["make"]);
+        eService.set("model", carObject["model"]);
+        eService.set("year", carObject["year"]);
+        //set values from service
+        eService.set('edmundsId', service["id"]);
+        eService.set('engineCode', service["engineCode"]);
+        eService.set('transmissionCode', service["transmissionCode"]);
+        eService.set('intervalMileage', service["intervalMileage"]);
+        eService.set('intervalMonth', service["intervalMonth"]);
+        eService.set('frequency', service["frequency"]);
+        eService.set('action', service["action"]);
+        eService.set('item', service["item"]);
+        eService.set('itemDescription', service["itemDescription"]);
+        eService.set('laborUnits', service["laborUnits"]);
+        eService.set('partUnits', service["partUnits"]);
+        eService.set('driveType', service["driveType"]);
+        //eService.set('modelYear', service["modelYear"]); //edmunds web api string
+
+        return eService;
+    }
+
+    var service = createEdmundsService(request.service, request.carObject);
+
+    service.save(null, {
+        success: function (savedCar) {
+            console.log("service saved");
+            response.success("service saved"); // success for cloud function
+        },
+        error: function (saveError) {
+            console.log("service not saved");
+            console.error(saveError);
+            response.error("service not saved"); //failure for cloud function
+        }
+    });
+    
+}
+
 Parse.Cloud.define("carServicesUpdate", function(request, status) {
   //request object is scan
   scan = request.params;
@@ -385,18 +403,37 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   var loadedEdmundsServices = function () {
 
     // looping through all the services
-    var  servicesToSave = [];
+
 
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
-        console.log("edmunds service:");
-        console.log(edmundsServices[i])
-        var service = createEdmundsService(edmundsServices[i],
+
+        /*var service = createEdmundsService(edmundsServices[i],
             {make: car.get('make'),
             model: car.get('model'),
             year: car.get('year')}
-        );//create class for edmunds service
-        servicesToSave.push(service);
+        );*/
+
+        Parse.Cloud.run("addEdmundsService", { //run with carServicesUpdate
+                service: edmundsServices[i],
+                carObject:
+                    {
+                        make: car.get('make'),
+                        model: car.get('model'),
+                        year: car.get('year')
+                    }
+            }, {
+                success: function(result){
+                    console.log("success: ")
+                    console.log(result)
+                },
+                error: function(error){
+                    console.log("addEdmundsService error:");
+                    console.error(error);
+                }
+            }
+        );
+
 
       var serviceQuery = new Parse.Query("Service");
 
@@ -483,18 +520,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         }
       });
     }
-
-      Parse.Object.saveAll(servicesToSave, {
-          success: function(data){
-              console.log("autoMileageUpdate Success");
-              status.success("servicesSaved");
-
-          },
-          error: function(error){
-              console.error("Error updating mileage from autoMileageUpdate: ", error);
-              status.error("services not saved");
-          }
-      });
   // just an event to be fired when the
   // for loop is over.
 
