@@ -229,7 +229,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
               console.error("Error: "+ error.code + " : " + error.message);
             }
           });
-
+    /*
     var userQuery = new Parse.Query(Parse.User);
 
         userQuery.equalTo('objectId', notification.get("toId"));
@@ -263,7 +263,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
                 console.error("Could not find user with objectId", notification.get("toId"));
                 console.error("ERROR: ", error);
             }
-        });
+        });*/
 
 });
 
