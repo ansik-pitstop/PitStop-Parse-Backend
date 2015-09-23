@@ -292,6 +292,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
         if ( dtcData !== undefined && dtcData !== ""){
             var dtcArray = car.get("storedDTCs")
+            console.log("dtcarray")
+            console.log(dtcArray)
 
 
             var dtcs = dtcData.split(",");
