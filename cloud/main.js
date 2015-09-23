@@ -385,6 +385,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   var loadedEdmundsServices = function () {
 
     // looping through all the services
+    var  servicesToSave = [];
+
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
         console.log("edmunds service:");
@@ -394,14 +396,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
             model: car.get('model'),
             year: car.get('year')}
         );//create class for edmunds service
-        service.save(null, {
-            success: function(service){
-                console.log('new service created with id: '+service.id);
-            },
-            error: function(error){
-                console.error("error: "+ error);
-            }
-        });
+        servicesToSave.append(service);
 
       var serviceQuery = new Parse.Query("Service");
 
@@ -489,7 +484,17 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
       });
     }
 
+      Parse.Object.saveAll(servicesToSave, {
+          success: function(data){
+              console.log("autoMileageUpdate Success");
+              status.success("servicesSaved");
 
+          },
+          error: function(error){
+              console.error("Error updating mileage from autoMileageUpdate: ", error);
+              status.error("services not saved");
+          }
+      });
   // just an event to be fired when the
   // for loop is over.
 
