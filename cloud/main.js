@@ -21,6 +21,39 @@ var EDMUNDS_API = {
 
 };
 
+class edmundsService extends Parse.Object {
+    constructor() {
+        // Pass the ClassName to the Parse.Object constructor
+        super('edmundsService');
+        // All other initialization
+
+    }
+
+    static create(service, carObject) {
+        var eService = new edmundsService();
+        //set values from carObject
+        eService.set("make", carObject["make"]);
+        eService.set("model", carObject["make"]);
+        eService.set("year", carObject["make"]);
+        //set values from service
+        eService.set('edmundsId', service["id"]);
+        eService.set('engineCode', service["engineCode"]);
+        eService.set('transmissionCode', service["transmissionCode"]);
+        eService.set('intervalMileage', service["intervalMileage"]);
+        eService.set('intervalMonth', service["intervalMonth"]);
+        eService.set('frequency', service["frequency"]);
+        eService.set('action', service["action"]);
+        eService.set('item', service["item"]);
+        eService.set('itemDescription', service["itemDescription"]);
+        eService.set('laborUnits', service["laborUnits"]);
+        eService.set('partUnits', service["partUnits"]);
+        eService.set('driveType', service["driveType"]);
+        eService.set('modelYear', service["modelYear"]);
+
+        return eService;
+    }
+}
+
 var edmundsServiceRequest = function(make, model, year, cb){
     // making a request to Edmunds for makeModelYearId
     Parse.Cloud.httpRequest({
@@ -405,6 +438,20 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     // looping through all the services
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
+
+        var service = edmundsService.create(edmundsServices[i],
+            {make: car.get('make'),
+            model: car.get('model'),
+            year: car.get('year')}
+        );//create class for edmunds service
+        service.save(null, {
+            success: function(service){
+                console.log('new service created with id: '+service.id);
+            }
+            error: function(error){
+                console.error('error', error);
+            }
+        });
 
       var serviceQuery = new Parse.Query("Service");
 
