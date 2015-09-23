@@ -199,11 +199,12 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
 });
 
-Parse.Cloud.define("addEdmundsService", function(request, status) {
+Parse.Cloud.define("addEdmundsServices", function(request, status) {
 
-    var createEdmundsService = function(service, carObject){
+    var createEdmundsService = function(service, carObject) {
         var Edmunds = Parse.Object.extend("EdmundsService");
         var eService = new Edmunds();
+
 
         //set values from carObject
         eService.set("make", carObject["make"]);
@@ -226,10 +227,13 @@ Parse.Cloud.define("addEdmundsService", function(request, status) {
 
         return eService;
     }
+    var services = []
 
-    var service = createEdmundsService(request.params.service, request.params.carObject);
+    for (var i = 0; i < edmundsServices.length; i++) {
+        services.push(createEdmundsService(request.params.service, request.params.carObject) );
+    }
 
-    service.save(null, {
+    Parse.Object.saveAll(services, {
         success: function (data) {
             console.log("service saved");
             status.success("service saved"); // success for cloud function
@@ -404,6 +408,25 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   var loadedEdmundsServices = function () {
 
     // looping through all the services
+  Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
+          services: edmundsServices,
+          carObject:
+          {
+              make: car.get('make'),
+              model: car.get('model'),
+              year: car.get('year')
+          }
+      }, {
+          success: function(result){
+              console.log("success: ")
+              console.log(result)
+          },
+          error: function(error){
+              console.log("addEdmundsServices error:");
+              console.error(error);
+          }
+      }
+  );
 
 
     var counter = 0; // this counter is async but using i isn't.
@@ -414,26 +437,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
             model: car.get('model'),
             year: car.get('year')}
         );*/
-
-        Parse.Cloud.run("addEdmundsService", { //run with carServicesUpdate
-                service: edmundsServices[i],
-                carObject:
-                    {
-                        make: car.get('make'),
-                        model: car.get('model'),
-                        year: car.get('year')
-                    }
-            }, {
-                success: function(result){
-                    console.log("success: ")
-                    console.log(result)
-                },
-                error: function(error){
-                    console.log("addEdmundsService error:");
-                    console.error(error);
-                }
-            }
-        );
 
 
       var serviceQuery = new Parse.Query("Service");
