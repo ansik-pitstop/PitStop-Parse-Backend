@@ -1,7 +1,7 @@
 /*
  Constants + Config
  */
-var sendgrid = require("sendgrid");
+
 
 var EDMUNDS_API = {
 
@@ -215,9 +215,10 @@ Parse.Cloud.afterSave("Notification", function(request) {
                 var email = userData[0]["email"];
                 var name = userData[0]["name"];
 
+                var sendgrid = require("sendgrid");
                 sendgrid.initialize("ansik", "Ansik.23");
 
-                SendGrid.sendEmail({
+                sendgrid.sendEmail({
                     to: [email+" (mailto:"+email+")"],
                     from: "yashin@ansik.ca (mailto:yashin@ansik.ca)",
                     subject: notification.get("title"),
@@ -297,29 +298,33 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
                 query.equalTo("dtcCode", dtcs[i]);
                 query.find({
                     success: function (data) {
-                        var description = data[0]["description"];
 
-                        var Notification = Parse.Object.extend("Notification");
-                        var notificationToSave = new Notification();
+                        if (data.length > 0) {
 
-                        var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i]+": "+description;
+                            var description = data[0]["description"];
 
-                        var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i];
+                            var Notification = Parse.Object.extend("Notification");
+                            var notificationToSave = new Notification();
 
-                        notificationToSave.set("content", notificationContent);
-                        notificationToSave.set("scanId", scan.id);
-                        notificationToSave.set("title", notificationTitle);
-                        notificationToSave.set("toId", car.get("owner"));
-                        notificationToSave.set("carId", car.id);
+                            var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i]+": "+description;
 
-                        notificationToSave.save(null, {
-                            success: function(notificationToSave){
-                                //saved
-                            },
-                            error: function(notificationToSave, error){
-                                console.error("Error: " + error.code + " " + error.message);
-                            }
-                        });
+                            var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i];
+
+                            notificationToSave.set("content", notificationContent);
+                            notificationToSave.set("scanId", scan.id);
+                            notificationToSave.set("title", notificationTitle);
+                            notificationToSave.set("toId", car.get("owner"));
+                            notificationToSave.set("carId", car.id);
+
+                            notificationToSave.save(null, {
+                                success: function(notificationToSave){
+                                    //saved
+                                },
+                                error: function(notificationToSave, error){
+                                    console.error("Error: " + error.code + " " + error.message);
+                                }
+                            });
+                        }
 
                     },
                     error: function (error) {
