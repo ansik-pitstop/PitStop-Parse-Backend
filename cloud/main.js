@@ -226,7 +226,7 @@ Parse.Cloud.define("addEdmundsService", function(request, status) {
         return eService;
     }
 
-    var service = createEdmundsService(request.service, request.carObject);
+    var service = createEdmundsService(request.params.service, request.params.carObject);
 
     service.save(null, {
         success: function (savedCar) {
