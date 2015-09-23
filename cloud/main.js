@@ -344,8 +344,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
 
             }
 
-            car.set("storedDTCs", dtcArray);
-
         }
         //save car
         car.save();
