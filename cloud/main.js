@@ -439,7 +439,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         service.save(null, {
             success: function(service){
                 console.log('new service created with id: '+service.id);
-            }
+            },
             error: function(error){
                 console.error('error', error);
             }
