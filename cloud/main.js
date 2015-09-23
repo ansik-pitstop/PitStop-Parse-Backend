@@ -229,8 +229,8 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
     }
     var services = []
 
-    for (var i = 0; i < edmundsServices.length; i++) {
-        services.push(createEdmundsService(request.params.service, request.params.carObject) );
+    for (var i = 0; i < request.params.services.length; i++) {
+        services.push(createEdmundsService(request.params.services[i], request.params.carObject) );
     }
 
     Parse.Object.saveAll(services, {
