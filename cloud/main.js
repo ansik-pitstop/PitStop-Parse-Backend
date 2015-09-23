@@ -297,54 +297,53 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
             for (var i = 0; i < dtcs.length; i++){
                 //check for DTCs
                 if (dtcs[i] != ""){
-                    car.addUnique("storedDTCs", dtcs[i])
-                }
+                    car.addUnique("storedDTCs", dtcs[i]);
 
-                var query = new Parse.Query("DTC");
-                console.log("dtc to find")
-                console.log(dtcs[i])
+                    var query = new Parse.Query("DTC");
+                    var dtc = dtcs[i]
+                    console.log("dtc to find")
+                    console.log(dtc)
 
-                query.equalTo("dtcCode", dtcs[i]);
-                query.find({
-                    success: function (data) {
+                    query.equalTo("dtcCode", dtcs[i]);
+                    query.find({
+                        success: function (data) {
 
-                        if (data.length > 0) {
-                            console.log("data")
-                            console.log(data)
-                            var description = data[0]["description"];
+                            if (data.length > 0) {
+                                console.log("data")
+                                console.log(data)
+                                var description = data[0].get("description");
 
-                            var Notification = Parse.Object.extend("Notification");
-                            var notificationToSave = new Notification();
+                                var Notification = Parse.Object.extend("Notification");
+                                var notificationToSave = new Notification();
 
-                            var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i]+": "+description;
+                                var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtc+": "+description;
 
-                            var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtcs[i];
+                                var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtc;
 
-                            notificationToSave.set("content", notificationContent);
-                            notificationToSave.set("scanId", scan.id);
-                            notificationToSave.set("title", notificationTitle);
-                            notificationToSave.set("toId", car.get("owner"));
-                            notificationToSave.set("carId", car.id);
+                                notificationToSave.set("content", notificationContent);
+                                notificationToSave.set("scanId", scan.id);
+                                notificationToSave.set("title", notificationTitle);
+                                notificationToSave.set("toId", car.get("owner"));
+                                notificationToSave.set("carId", car.id);
 
-                            notificationToSave.save(null, {
-                                success: function(notificationToSave){
-                                    //saved
-                                },
-                                error: function(notificationToSave, error){
-                                    console.error("Error: " + error.code + " " + error.message);
-                                }
-                            });
+                                notificationToSave.save(null, {
+                                    success: function(notificationToSave){
+                                        //saved
+                                    },
+                                    error: function(notificationToSave, error){
+                                        console.error("Error: " + error.code + " " + error.message);
+                                    }
+                                });
+                            }
+
+                        },
+                        error: function (error) {
+                            console.error("Could not find the dtc with code: ", dtcs[i]);
+                            console.error("ERROR: ", error);
                         }
+                    });
 
-                    },
-                    error: function (error) {
-                        console.error("Could not find the dtc with code: ", dtcs[i]);
-                        console.error("ERROR: ", error);
-                    }
-                });
-
-
-
+                }
 
             }
 
