@@ -46,49 +46,6 @@ var createEdmundsService = function(service, carObject){
     return eService;
 }
 
-var edmundsServiceRequest = function(make, model, year, cb){
-    // making a request to Edmunds for makeModelYearId
-    Parse.Cloud.httpRequest({
-
-        url: EDMUNDS_API.requestPaths.makeModelYearId(
-            make,
-            model,
-            year
-        ),
-
-        success: function (results) {
-
-            carMakeModelYearId = JSON.parse(results.text).id;
-
-            Parse.Cloud.httpRequest({
-
-                url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
-
-                success: function (results) {
-                    var edmundsServices = JSON.parse(results.text).actionHolder;
-                    console.log("Loaded EdmundsServices: ");
-                    console.log(edmundsServices);
-                    cb(edmundsServices)
-                },
-
-                error: function (error) {
-                    console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
-                    console.error(error);
-
-                }
-
-            });
-
-        },
-
-        error: function (error) {
-            console.error("Could not get carMakeModelYearId from Edmunds");
-            console.error("ERROR: ", error);
-        }
-
-    });
-}
-
 /*
  
  Car aftersave: load calibration services
@@ -430,7 +387,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
     // looping through all the services
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
-
+        console.log("edmunds service:");
+        console.log(edmundsServices[i])
         var service = createEdmundsService(edmundsServices[i],
             {make: car.get('make'),
             model: car.get('model'),
