@@ -231,12 +231,12 @@ Parse.Cloud.define("addEdmundsService", function(request, status) {
     service.save(null, {
         success: function (savedCar) {
             console.log("service saved");
-            response.success("service saved"); // success for cloud function
+            status.success("service saved"); // success for cloud function
         },
         error: function (saveError) {
             console.log("service not saved");
             console.error(saveError);
-            response.error("service not saved"); //failure for cloud function
+            status.error("service not saved"); //failure for cloud function
         }
     });
 
