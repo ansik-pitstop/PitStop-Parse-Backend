@@ -306,7 +306,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
                     success: function (data) {
 
                         if (data.length > 0) {
-
+                            console.log("data")
+                            console.log(data)
                             var description = data[0]["description"];
 
                             var Notification = Parse.Object.extend("Notification");
