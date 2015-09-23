@@ -160,6 +160,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
         PIDs: scan.get("PIDs"),
+        DTCs: scan.get("DTCs"),
         id: scan.id
       }, {
       success: function(result){
