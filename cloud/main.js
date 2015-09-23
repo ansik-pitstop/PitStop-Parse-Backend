@@ -21,7 +21,7 @@ var EDMUNDS_API = {
 
 };
 
-class edmundsService extends Parse.Object {
+class EdmundsService extends Parse.Object {
     constructor() {
         // Pass the ClassName to the Parse.Object constructor
         super('edmundsService');
