@@ -239,8 +239,8 @@ Parse.Cloud.define("addEdmundsService", function(request, status) {
             response.error("service not saved"); //failure for cloud function
         }
     });
-    
-}
+
+});
 
 Parse.Cloud.define("carServicesUpdate", function(request, status) {
   //request object is scan
