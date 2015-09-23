@@ -202,7 +202,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 Parse.Cloud.define("addEdmundsService", function(request, status) {
 
     var createEdmundsService = function(service, carObject){
-        eService = new Parse.Object("EdmundsService");
+        var eService = new Parse.Object("EdmundsService");
 
         //set values from carObject
         eService.set("make", carObject["make"]);
@@ -229,7 +229,7 @@ Parse.Cloud.define("addEdmundsService", function(request, status) {
     var service = createEdmundsService(request.params.service, request.params.carObject);
 
     service.save(null, {
-        success: function (savedCar) {
+        success: function (data) {
             console.log("service saved");
             status.success("service saved"); // success for cloud function
         },
