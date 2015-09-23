@@ -441,7 +441,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
                 console.log('new service created with id: '+service.id);
             },
             error: function(error){
-                console.error('error', error);
+                console.error("error: "+ error);
             }
         });
 
