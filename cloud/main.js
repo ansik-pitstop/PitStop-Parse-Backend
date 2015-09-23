@@ -215,7 +215,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
                 var email = userData[0]["email"];
                 var name = userData[0]["name"];
 
-                /*
+
                 var sendgrid = require("sendgrid");
                 sendgrid.initialize("ansik", "Ansik.23");
 
@@ -231,7 +231,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
                 },function(httpResponse) {
                     console.error(httpResponse);
                     response.error("error");
-                });*/
+                });
 
             },
             error: function(error){
