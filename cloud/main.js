@@ -291,17 +291,13 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         console.log(dtcData)
 
         if ( dtcData !== undefined && dtcData !== ""){
-            var dtcArray = car.get("storedDTCs")
-            console.log("dtcarray")
-            console.log(dtcArray)
-
 
             var dtcs = dtcData.split(",");
 
             for (var i = 0; i < dtcs.length; i++){
                 //check for DTCs
                 if (dtcs[i] != ""){
-                    dtcArray.append(dtcs[i])
+                    car.addUnique("storedDTCs", dtcs[i])
                 }
 
                 var query = new Parse.Query("DTC");
