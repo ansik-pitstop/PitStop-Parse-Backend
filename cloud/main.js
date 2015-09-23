@@ -396,7 +396,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
             model: car.get('model'),
             year: car.get('year')}
         );//create class for edmunds service
-        servicesToSave.append(service);
+        servicesToSave.push(service);
 
       var serviceQuery = new Parse.Query("Service");
 
