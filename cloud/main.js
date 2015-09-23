@@ -202,7 +202,8 @@ Parse.Cloud.afterSave("Notification", function(request) {
 Parse.Cloud.define("addEdmundsService", function(request, status) {
 
     var createEdmundsService = function(service, carObject){
-        var eService = new Parse.Object("EdmundsService");
+        var Edmunds = Parse.Object.extend("EdmundsService");
+        var eService = new Edmunds();
 
         //set values from carObject
         eService.set("make", carObject["make"]);
