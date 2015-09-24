@@ -22,6 +22,34 @@ var EDMUNDS_API = {
 };
 
 /*
+Edmunds Service Before save: don't save duplicates
+
+*/
+Parse.Cloud.beforeSave("EdmundsService", function(request, response){
+
+    var edmundsId = request.object.get("edmundsId");
+    var edmundsQuery = new Parse.Query("EdmundsService");
+    edmundsQuery.equalTo("edmundsId", edmundsId);
+    edmundsQuery.first({
+        success: function(data){
+            if (data !== undefined){
+                //checks if there is existing object in table with service
+                response.error("An EdmundsService with this edmundsId already exists.");
+            }else{
+                //if there is not existing object with edmundsId, continue with save
+                response.success();
+            }
+        },
+        error: function(error){
+            console.error(error);
+            response.error("EdmundsService BeforeSave query error: "+error);
+        }
+    })
+
+
+});
+
+/*
  
  Car aftersave: load calibration services
  */
@@ -247,7 +275,7 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
 
 });
 
-Parse.Cloud.define("carServicesUpdate", function(request, status) {
+Parse.Cloud.define("carServicesUpdate", function(request, response) {
   //request object is scan
   scan = request.params;
 
@@ -264,7 +292,11 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   query.equalTo("scannerId", scan["scannerId"]);
   query.find({
   success: function (cars) {
-  foundCar(cars[0]);
+      if (cars.length > 0){
+          foundCar(cars[0]);
+      }else{
+          response.error("No results for car with ScannerId: "+scan["scannerId"]);
+      }
   },
   error: function (error) {
   console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
@@ -305,9 +337,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
                     car.addUnique("storedDTCs", dtcs[i]);
 
                     var query = new Parse.Query("DTC");
-                    var dtc = dtcs[i]
-                    console.log("dtc to find")
-                    console.log(dtc)
+                    var dtc = dtcs[i];
+                    console.log("dtc to find");
+                    console.log(dtc);
 
                     query.equalTo("dtcCode", dtcs[i]);
                     query.find({
