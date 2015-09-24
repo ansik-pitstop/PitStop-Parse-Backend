@@ -174,7 +174,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
           Parse.Push.send({
               where: pushQuery,
-              badge: "Increment",
+              badge: "increment",
               data:{
                 //data for push notification
                 alert: notification.get("content"), //to enable ios push
