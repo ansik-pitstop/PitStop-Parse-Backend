@@ -2,7 +2,8 @@
  Constants + Config
  */
 
- var EDMUNDS_API = {
+
+var EDMUNDS_API = {
 
    host: "api.edmunds.com",
    tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
@@ -18,7 +19,35 @@
      }
    }
 
- };
+};
+
+/*
+Edmunds Service Before save: don't save duplicates
+
+*/
+Parse.Cloud.beforeSave("EdmundsService", function(request, response){
+
+    var edmundsId = request.object.get("edmundsId");
+    var edmundsQuery = new Parse.Query("EdmundsService");
+    edmundsQuery.equalTo("edmundsId", edmundsId);
+    edmundsQuery.first({
+        success: function(data){
+            if (data !== undefined){
+                //checks if there is existing object in table with service
+                response.error("An EdmundsService with this edmundsId already exists.");
+            }else{
+                //if there is not existing object with edmundsId, continue with save
+                response.success();
+            }
+        },
+        error: function(error){
+            console.error(error);
+            response.error("EdmundsService BeforeSave query error: "+error);
+        }
+    })
+
+
+});
 
 /*
  
@@ -86,6 +115,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     if (scan.get("runAfterSave") !== true) {
     return;
     }
+
     /*
     Parse.Cloud.httpRequest({
         method: "POST",
@@ -115,6 +145,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
         scannerId: scan.get("scannerId"),
         mileage: scan.get("mileage"),
         PIDs: scan.get("PIDs"),
+        DTCs: scan.get("DTCs"),
         id: scan.id
       }, {
       success: function(result){
@@ -158,10 +189,93 @@ Parse.Cloud.afterSave("Notification", function(request) {
               console.error("Error: "+ error.code + " : " + error.message);
             }
           });
+    /*
+    var userQuery = new Parse.Query(Parse.User);
+
+        userQuery.equalTo('objectId', notification.get("toId"));
+        userQuery.find({
+            success: function(userData){
+                //send notification email to users
+
+                var email = userData[0]["email"];
+                var name = userData[0]["name"];
+
+
+                var sendgrid = require("sendgrid");
+                sendgrid.initialize("ansik", "Ansik.23");
+
+                sendgrid.sendEmail({
+                    to: [email],
+                    from: "yashin@ansik.ca",
+                    subject: notification.get("title"),
+                    text: notification.get("content"),
+                    replyto: "yashin@ansik.ca"
+                }).then(function(httpResponse) {
+                    console.log(httpResponse);
+                    response.success("Email sent");
+                },function(httpResponse) {
+                    console.error(httpResponse);
+                    response.error("error");
+                });
+
+            },
+            error: function(error){
+                console.error("Could not find user with objectId", notification.get("toId"));
+                console.error("ERROR: ", error);
+            }
+        });*/
 
 });
 
-Parse.Cloud.define("carServicesUpdate", function(request, status) {
+Parse.Cloud.define("addEdmundsServices", function(request, status) {
+
+    var createEdmundsService = function(service, carObject) {
+        var Edmunds = Parse.Object.extend("EdmundsService");
+        var eService = new Edmunds();
+
+
+        //set values from carObject
+        eService.set("make", carObject["make"]);
+        eService.set("model", carObject["model"]);
+        eService.set("year", carObject["year"]);
+        //set values from service
+        eService.set('edmundsId', service["id"]);
+        eService.set('engineCode', service["engineCode"]);
+        eService.set('transmissionCode', service["transmissionCode"]);
+        eService.set('intervalMileage', service["intervalMileage"]);
+        eService.set('intervalMonth', service["intervalMonth"]);
+        eService.set('frequency', service["frequency"]);
+        eService.set('action', service["action"]);
+        eService.set('item', service["item"]);
+        eService.set('itemDescription', service["itemDescription"]);
+        eService.set('laborUnits', service["laborUnits"]);
+        eService.set('partUnits', service["partUnits"]);
+        eService.set('driveType', service["driveType"]);
+        //eService.set('modelYear', service["modelYear"]); //edmunds web api string
+
+        return eService;
+    }
+    var services = []
+
+    for (var i = 0; i < request.params.services.length; i++) {
+        services.push(createEdmundsService(request.params.services[i], request.params.carObject) );
+    }
+
+    Parse.Object.saveAll(services, {
+        success: function (data) {
+            console.log("service saved");
+            status.success("service saved"); // success for cloud function
+        },
+        error: function (saveError) {
+            console.log("service not saved");
+            console.error(saveError);
+            status.error("service not saved"); //failure for cloud function
+        }
+    });
+
+});
+
+Parse.Cloud.define("carServicesUpdate", function(request, response) {
   //request object is scan
   scan = request.params;
 
@@ -178,7 +292,11 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   query.equalTo("scannerId", scan["scannerId"]);
   query.find({
   success: function (cars) {
-  foundCar(cars[0]);
+      if (cars.length > 0){
+          foundCar(cars[0]);
+      }else{
+          response.error("No results for car with ScannerId: "+scan["scannerId"]);
+      }
   },
   error: function (error) {
   console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
@@ -203,7 +321,74 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         carMileage = scanMileage + car.get("baseMileage");
         }
         car.set("totalMileage", carMileage);
+
+        //parse dtcs and create notification
+        var dtcData = scan["DTCs"];
+        console.log("dtcs")
+        console.log(dtcData)
+
+        if ( dtcData !== undefined && dtcData !== ""){
+
+            var dtcs = dtcData.split(",");
+
+            for (var i = 0; i < dtcs.length; i++){
+                //check for DTCs
+                if (dtcs[i] != ""){
+                    car.addUnique("storedDTCs", dtcs[i]);
+
+                    var query = new Parse.Query("DTC");
+                    var dtc = dtcs[i];
+                    console.log("dtc to find");
+                    console.log(dtc);
+
+                    query.equalTo("dtcCode", dtcs[i]);
+                    query.find({
+                        success: function (data) {
+
+                            if (data.length > 0) {
+                                console.log("data")
+                                console.log(data)
+                                var description = data[0].get("description");
+
+                                var Notification = Parse.Object.extend("Notification");
+                                var notificationToSave = new Notification();
+
+                                var notificationContent = car.get("make") + " " + car.get("model") + " has DTC Code "+dtc+": "+description;
+
+                                var notificationTitle =  car.get("make") + " " + car.get("model") + " has DTC Code "+dtc;
+
+                                notificationToSave.set("content", notificationContent);
+                                notificationToSave.set("scanId", scan.id);
+                                notificationToSave.set("title", notificationTitle);
+                                notificationToSave.set("toId", car.get("owner"));
+                                notificationToSave.set("carId", car.id);
+
+                                notificationToSave.save(null, {
+                                    success: function(notificationToSave){
+                                        //saved
+                                    },
+                                    error: function(notificationToSave, error){
+                                        console.error("Error: " + error.code + " " + error.message);
+                                    }
+                                });
+                            }
+
+                        },
+                        error: function (error) {
+                            console.error("Could not find the dtc with code: ", dtcs[i]);
+                            console.error("ERROR: ", error);
+                        }
+                    });
+
+                }
+
+            }
+
+        }
+        //save car
         car.save();
+        console.log("car saved")
+
 
 
         // making a request to Edmunds for makeModelYearId
@@ -255,8 +440,36 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
   var loadedEdmundsServices = function () {
 
     // looping through all the services
+  Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
+          services: edmundsServices,
+          carObject:
+          {
+              make: car.get('make'),
+              model: car.get('model'),
+              year: car.get('year')
+          }
+      }, {
+          success: function(result){
+              console.log("success: ")
+              console.log(result)
+          },
+          error: function(error){
+              console.log("addEdmundsServices error:");
+              console.error(error);
+          }
+      }
+  );
+
+
     var counter = 0; // this counter is async but using i isn't.
     for (var i = 0; i < edmundsServices.length; i++) {
+
+        /*var service = createEdmundsService(edmundsServices[i],
+            {make: car.get('make'),
+            model: car.get('model'),
+            year: car.get('year')}
+        );*/
+
 
       var serviceQuery = new Parse.Query("Service");
 
@@ -343,8 +556,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, status) {
         }
       });
     }
-
-
   // just an event to be fired when the
   // for loop is over.
 
