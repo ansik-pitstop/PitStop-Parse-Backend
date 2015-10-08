@@ -340,9 +340,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                     car.addUnique("storedDTCs", dtcs[i]);
 
                     var query = new Parse.Query("DTC");
-                    var dtc = dtcs[i];
-                    console.log("dtc to find");
-                    console.log(dtc);
+                    //var dtc = dtcs[i];
+                    //console.log("dtc to find");
+                    //console.log(dtc);
 
                     query.equalTo("dtcCode", dtcs[i]);
                     query.find({
@@ -352,6 +352,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                                 console.log("data")
                                 console.log(data)
                                 var description = data[0].get("description");
+                                var dtc = data[0].get("dtcCode")
 
                                 var Notification = Parse.Object.extend("Notification");
                                 var notificationToSave = new Notification();
