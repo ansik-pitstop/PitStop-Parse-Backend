@@ -394,11 +394,11 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         console.log("car saved")
 
         // query for the Edmunds Services associated with this Car
-        var edmundsEuery = new Parse.Query("EdmundsService");
-        edmundsEuery.equalTo("make", car["make"]);
-        edmundsEuery.equalTo("model", car["model"]);
-        edmundsEuery.equalTo("year", car["year"]);
-        edmundsEuery.find({
+        var edmundsQuery = new Parse.Query("EdmundsService");
+        edmundsQuery.equalTo("make", car.get("make"));
+        edmundsQuery.equalTo("model", car.get("model"));
+        edmundsQuery.equalTo("year", car.get("year"));
+        edmundsQuery.find({
             success: function (services) {
                 if (services.length > 0){
                     edmundsServices = services;
@@ -406,7 +406,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                     console.log(edmundsServices);
                     loadedEdmundsServices();
                 }else{
-                    console.log("Edmunds Services for "+car["make"]+" "+car["model"]+" "+car["year"]+" not stored in EdmundService table");
+                    console.log("Edmunds Services for "+car.get("make")+" "+car.get("model")+" "+car.get("year")+" not stored in EdmundService table");
                     newServices = true;
                     // making a request to Edmunds for makeModelYearId
                     Parse.Cloud.httpRequest({
