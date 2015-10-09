@@ -285,6 +285,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   var carMileage = 0;
   var serviceStack = [];
   var edmundsServices = [];
+  var newServices = false;
   //var carType = null;
 
   // query for the car associated with this Scan
@@ -303,6 +304,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   console.error("ERROR: ", error);
   }
   });
+
+
 
   /*
   This function is called when the car associated with the
@@ -337,9 +340,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                     car.addUnique("storedDTCs", dtcs[i]);
 
                     var query = new Parse.Query("DTC");
-                    var dtc = dtcs[i];
-                    console.log("dtc to find");
-                    console.log(dtc);
+                    //var dtc = dtcs[i];
+                    //console.log("dtc to find");
+                    //console.log(dtc);
 
                     query.equalTo("dtcCode", dtcs[i]);
                     query.find({
@@ -349,6 +352,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                                 console.log("data")
                                 console.log(data)
                                 var description = data[0].get("description");
+                                var dtc = data[0].get("dtcCode")
 
                                 var Notification = Parse.Object.extend("Notification");
                                 var notificationToSave = new Notification();
@@ -389,47 +393,70 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         car.save();
         console.log("car saved")
 
+        // query for the Edmunds Services associated with this Car
+        var edmundsQuery = new Parse.Query("EdmundsService");
+        edmundsQuery.equalTo("make", car.get("make"));
+        edmundsQuery.equalTo("model", car.get("model"));
+        edmundsQuery.equalTo("year", car.get("year"));
+        edmundsQuery.find({
+            success: function (services) {
+                if (services.length > 0){
+                    edmundsServices = services;
+                    console.log('edmundsQuery services: ');
+                    console.log(edmundsServices);
+                    loadedEdmundsServices();
+                }else{
+                    console.log("Edmunds Services for "+car.get("make")+" "+car.get("model")+" "+car.get("year")+" not stored in EdmundService table");
+                    newServices = true;
+                    // making a request to Edmunds for makeModelYearId
+                    Parse.Cloud.httpRequest({
 
+                        url: EDMUNDS_API.requestPaths.makeModelYearId(
+                            car.get('make'),
+                            car.get('model'),
+                            car.get('year')
+                        ),
 
-        // making a request to Edmunds for makeModelYearId
-        Parse.Cloud.httpRequest({
+                        success: function (results) {
 
-        url: EDMUNDS_API.requestPaths.makeModelYearId(
-        car.get('make'),
-        car.get('model'),
-        car.get('year')
-        ),
+                            carMakeModelYearId = JSON.parse(results.text).id;
 
-        success: function (results) {
+                            Parse.Cloud.httpRequest({
 
-        carMakeModelYearId = JSON.parse(results.text).id;
+                                url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
 
-        Parse.Cloud.httpRequest({
+                                success: function (results) {
+                                    edmundsServices = JSON.parse(results.text).actionHolder;
+                                    console.log("Calling loadedEdmundsServices with: ");
+                                    console.log(edmundsServices);
+                                    loadedEdmundsServices();
+                                },
 
-          url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
+                                error: function (error) {
+                                    console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
+                                    console.error(error);
+                                }
 
-          success: function (results) {
-          edmundsServices = JSON.parse(results.text).actionHolder;
-          console.log("Calling loadedEdmundsServices with: ");
-          console.log(edmundsServices);
-          loadedEdmundsServices();
-          },
+                            });
 
-          error: function (error) {
-          console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
-          console.error(error);
-          }
+                        },
 
+                        error: function (error) {
+                            console.error("Could not get carMakeModelYearId from Edmunds");
+                            console.error("ERROR: ", error);
+                        }
+
+                    });
+                }
+            },
+            error: function (error) {
+                //console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
+                console.error("ERROR: ", error);
+            }
         });
 
-        },
 
-        error: function (error) {
-        console.error("Could not get carMakeModelYearId from Edmunds");
-        console.error("ERROR: ", error);
-        }
 
-        });
     };
 
   /*
@@ -440,25 +467,29 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   var loadedEdmundsServices = function () {
 
     // looping through all the services
-  Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
-          services: edmundsServices,
-          carObject:
-          {
-              make: car.get('make'),
-              model: car.get('model'),
-              year: car.get('year')
-          }
-      }, {
-          success: function(result){
-              console.log("success: ")
-              console.log(result)
-          },
-          error: function(error){
-              console.log("addEdmundsServices error:");
-              console.error(error);
-          }
+      if (newServices){
+          //only run this if the services are not already in table
+          Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
+                  services: edmundsServices,
+                  carObject:
+                  {
+                      make: car.get('make'),
+                      model: car.get('model'),
+                      year: car.get('year')
+                  }
+              }, {
+                  success: function(result){
+                      console.log("success: ")
+                      console.log(result)
+                  },
+                  error: function(error){
+                      console.log("addEdmundsServices error:");
+                      console.error(error);
+                  }
+              }
+          );
       }
-  );
+
 
 
     var counter = 0; // this counter is async but using i isn't.
