@@ -54,6 +54,30 @@ Parse.Cloud.beforeSave("EdmundsService", function(request, response){
 
 });
 
+Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
+
+    var edmundsId = request.object.get("edmundsId");
+    var edmundsQuery = new Parse.Query("EdmundsRecall");
+    edmundsQuery.equalTo("edmundsId", edmundsId);
+    edmundsQuery.first({
+        success: function(data){
+            if (data !== undefined){
+                //checks if there is existing object in table with service
+                response.error("An EdmundsRecall with this edmundsId already exists.");
+            }else{
+                //if there is not existing object with edmundsId, continue with save
+                response.success();
+            }
+        },
+        error: function(error){
+            console.error(error);
+            response.error("EdmundsRecall BeforeSave query error: "+error);
+        }
+    })
+
+
+});
+
 /*
  
  Car aftersave: load calibration services
@@ -65,6 +89,71 @@ Parse.Cloud.afterSave("Car", function(request){
 //set calibration services (priority = 4)
   var car = request.object;
   if (request.object.existed() == true){
+
+      // making a request to Edmunds for makeModelYearId
+
+      Parse.Cloud.httpRequest({
+
+          url: EDMUNDS_API.requestPaths.makeModelYearId(
+              car.get('make'),
+              car.get('model'),
+              car.get('year')
+          ),
+
+          success: function (results) {
+
+              carMakeModelYearId = JSON.parse(results.text).id;
+
+              // saving recalls to database
+              Parse.Cloud.httpRequest({
+
+                  url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
+
+                  success: function (results) {
+                      edmundsServices = JSON.parse(results.text).recallHolder;
+                      console.log("got edmunds recalls");
+
+                      //if (newRecalls){
+                          //only run this if the services are not already in table
+                          Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
+                                  recalls: results["recallHolder"],
+                                  carObject:
+                                  {
+                                      make: car.get('make'),
+                                      model: car.get('model'),
+                                      year: car.get('year')
+                                  }
+                              }, {
+                                  success: function(result){
+                                      console.log("success: ")
+                                      console.log(result)
+                                  },
+                                  error: function(error){
+                                      console.log("addEdmundsServices error:");
+                                      console.error(error);
+                                  }
+                              }
+                          );
+                      //}
+
+                  },
+
+                  error: function (error) {
+                      console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
+                      console.error(error);
+                  }
+
+              });
+
+          },
+
+          error: function (error) {
+              console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
+              console.error("ERROR: ", error);
+          }
+
+      });
+
       return;
   }
                       
@@ -102,51 +191,12 @@ Parse.Cloud.afterSave("Car", function(request){
              }
              });
 
-    // making a request to Edmunds for makeModelYearId
-    /*
-    Parse.Cloud.httpRequest({
 
-        url: EDMUNDS_API.requestPaths.makeModelYearId(
-            car.get('make'),
-            car.get('model'),
-            car.get('year')
-        ),
-
-        success: function (results) {
-
-            carMakeModelYearId = JSON.parse(results.text).id;
-
-            // saving recalls to database
-            Parse.Cloud.httpRequest({
-
-                url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
-
-                success: function (results) {
-                    edmundsServices = JSON.parse(results.text).recallHolder;
-                    console.log("Calling loadedEdmundsServices with: ");
-                    console.log(edmundsServices);
-
-                },
-
-                error: function (error) {
-                    console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
-                    console.error(error);
-                }
-
-            });
-
-        },
-
-        error: function (error) {
-            console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
-            console.error("ERROR: ", error);
-        }
-
-    });*/
 
   //should run job/func here to update services/mileage at an interval
-                      
-    
+
+
+
 });
 
  /*
@@ -160,6 +210,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
     // stopping the function if not required
     if (scan.get("runAfterSave") !== true) {
+
     return;
     }
 
