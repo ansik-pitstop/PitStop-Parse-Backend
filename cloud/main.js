@@ -115,7 +115,7 @@ Parse.Cloud.afterSave("Car", function(request){
 
                       //if (newRecalls){
                           //only run this if the services are not already in table
-                          Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
+                          Parse.Cloud.run("addEdmundsRecalls", { //run with carServicesUpdate
                                   recalls: results["recallHolder"],
                                   carObject:
                                   {
