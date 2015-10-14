@@ -110,13 +110,13 @@ Parse.Cloud.afterSave("Car", function(request){
                   url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
 
                   success: function (results) {
-                      edmundsServices = JSON.parse(results.text).recallHolder;
+                      var edmundsRecalls = JSON.parse(results.text).recallHolder;
                       console.log("got edmunds recalls");
 
                       //if (newRecalls){
                           //only run this if the services are not already in table
                           Parse.Cloud.run("addEdmundsRecalls", { //run with carServicesUpdate
-                                  recalls: results["recallHolder"],
+                                  recalls: edmundsRecalls,
                                   carObject:
                                   {
                                       make: car.get('make'),
