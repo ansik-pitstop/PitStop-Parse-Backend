@@ -103,6 +103,9 @@ Parse.Cloud.afterSave("Car", function(request){
 
               var recallQuery = new Parse.Query("EdmundsRecall");
               recallQuery.notContainedIn("objectId", serviceIdStrings);
+              recallQuery.equalTo("make", car.get("make"));
+              recallQuery.equalTo("model", car.get("model"));
+              recallQuery.equalTo("year", car.get("year"));
               recallQuery.find({
                   success: function (services) {
                       var serviceIdStrings = services.map(function(s){return s.id;});
