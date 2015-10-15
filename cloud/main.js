@@ -7,17 +7,22 @@ var EDMUNDS_API = {
 
    host: "api.edmunds.com",
    tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
-   requestPaths: {
-     makeModelYearId: function (make, model, year) {
-       var path = "/api/vehicle/v2/";
-       return EDMUNDS_API.host + path + make + "/" + model + "/" + "/" + year + '?' + EDMUNDS_API.tail;
-     },
-     maintenance: function (Id) {
-       console.log("carMakeModelYearId: " + Id);
-       var path = "/v1/api/maintenance/actionrepository/findbymodelyearid?modelyearid=";
-       return EDMUNDS_API.host + path + Id + '&' + EDMUNDS_API.tail;
-     }
-   }
+    requestPaths: {
+        makeModelYearId: function (make, model, year) {
+            var path = "/api/vehicle/v2/";
+            return EDMUNDS_API.host + path + make + "/" + model + "/" + "/" + year + '?' + EDMUNDS_API.tail;
+        },
+        maintenance: function (Id) {
+            console.log("carMakeModelYearId: " + Id);
+            var path = "/v1/api/maintenance/actionrepository/findbymodelyearid?modelyearid=";
+            return EDMUNDS_API.host + path + Id + '&' + EDMUNDS_API.tail;
+        },
+        recall: function (Id) {
+            console.log("carMakeModelYearId: " + Id);
+            var path = "/v1/api/maintenance/recallrepository/findbymodelyearid?modelyearid=";
+            return EDMUNDS_API.host + path + Id + '&' + EDMUNDS_API.tail;
+        }
+    }
 
 };
 
@@ -49,17 +54,147 @@ Parse.Cloud.beforeSave("EdmundsService", function(request, response){
 
 });
 
+Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
+
+    var edmundsId = request.object.get("edmundsId");
+    var edmundsQuery = new Parse.Query("EdmundsRecall");
+    edmundsQuery.equalTo("edmundsId", edmundsId);
+    edmundsQuery.first({
+        success: function(data){
+            if (data !== undefined){
+                //checks if there is existing object in table with service
+                response.error("An EdmundsRecall with this edmundsId already exists.");
+            }else{
+                //if there is not existing object with edmundsId, continue with save
+                response.success();
+            }
+        },
+        error: function(error){
+            console.error(error);
+            response.error("EdmundsRecall BeforeSave query error: "+error);
+        }
+    })
+
+
+});
+/*
+ Car beforeSave: add recall information
+*/
+
+Parse.Cloud.beforeSave("Car", function(request, response){
+   // check recalls before save
+    var car = request.object;
+
+    var historyQuery = new Parse.Query("ServiceHistory");
+    historyQuery.equalTo("serviceId", 124);
+    historyQuery.equalTo("carId", car.id);
+    historyQuery.find({
+        success: function (services) {
+            //function to send services to app
+
+            var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
+
+            var recallQuery = new Parse.Query("EdmundsRecall");
+            recallQuery.notContainedIn("objectId", serviceIdStrings);
+            recallQuery.equalTo("make", car.get("make"));
+            recallQuery.equalTo("model", car.get("model"));
+            recallQuery.equalTo("year", car.get("year"));
+            recallQuery.find({
+                success: function (services) {
+                    var serviceIdStrings = services.map(function(s){return s.id;});
+                    car.set("pendingRecalls", serviceIdStrings)
+                    response.success();
+                },
+                error: function(error){
+                    response.success(); //call success anyway
+                }
+            });
+
+        },
+        error: function (error) {
+            console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
+            console.error("ERROR: ", error);
+            response.error("error with service history - car not saved");
+        }
+    });
+
+});
+
 /*
  
  Car aftersave: load calibration services
  */
- 
+
 
 Parse.Cloud.afterSave("Car", function(request){
 //first time saving the car,
 //set calibration services (priority = 4)
-  var car = request.object;
+    var car = request.object;
+    //var serviceHistory = [];
   if (request.object.existed() == true){
+
+      // making a request to Edmunds for makeModelYearId
+      Parse.Cloud.httpRequest({
+
+          url: EDMUNDS_API.requestPaths.makeModelYearId(
+              car.get('make'),
+              car.get('model'),
+              car.get('year')
+          ),
+
+          success: function (results) {
+
+              carMakeModelYearId = JSON.parse(results.text).id;
+
+              // saving recalls to database
+              Parse.Cloud.httpRequest({
+
+                  url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
+
+                  success: function (results) {
+                      var edmundsRecalls = JSON.parse(results.text).recallHolder;
+                      console.log("got edmunds recalls");
+
+
+
+                      Parse.Cloud.run("addEdmundsRecalls", {
+                              recalls: edmundsRecalls,
+                              carObject:
+                              {
+                                  make: car.get('make'),
+                                  model: car.get('model'),
+                                  year: car.get('year')
+                              }
+                          }, {
+                              success: function(result){
+                                  console.log("success: ")
+                                  console.log(result)
+                              },
+                              error: function(error){
+                                  console.log("addEdmundsServices error:");
+                                  console.error(error);
+                              }
+                          }
+                      );
+
+                  },
+
+                  error: function (error) {
+                      console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
+                      console.error(error);
+                  }
+
+              });
+
+          },
+
+          error: function (error) {
+              console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
+              console.error("ERROR: ", error);
+          }
+
+      });
+
       return;
   }
                       
@@ -97,9 +232,12 @@ Parse.Cloud.afterSave("Car", function(request){
              }
              });
 
+
+
   //should run job/func here to update services/mileage at an interval
-                      
-    
+
+
+
 });
 
  /*
@@ -113,6 +251,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
     // stopping the function if not required
     if (scan.get("runAfterSave") !== true) {
+
     return;
     }
 
@@ -255,7 +394,7 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
 
         return eService;
     }
-    var services = []
+    var services = [];
 
     for (var i = 0; i < request.params.services.length; i++) {
         services.push(createEdmundsService(request.params.services[i], request.params.carObject) );
@@ -270,6 +409,53 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
             console.log("service not saved");
             console.error(saveError);
             status.error("service not saved"); //failure for cloud function
+        }
+    });
+
+});
+
+
+Parse.Cloud.define("addEdmundsRecalls", function(request, status) {
+
+    var createEdmundsService = function(recall, carObject) {
+        var Edmunds = Parse.Object.extend("EdmundsRecall");
+        var eRecall = new Edmunds();
+
+
+        //set values from carObject
+        eRecall.set("make", carObject["make"]);
+        eRecall.set("model", carObject["model"]);
+        eRecall.set("year", carObject["year"]);
+        //set values from service
+        eRecall.set('edmundsId', recall["id"]);
+        eRecall.set('recallNumber', recall["recallNumber"]);
+        eRecall.set('componentDescription', recall["componentDescription"]);
+        eRecall.set('manufacturerRecallNumber', recall["manufacturerRecallNumber"]);
+        eRecall.set('manufacturedTo', recall["manufacturedTo"]);
+        eRecall.set('numberOfVehiclesAffected', recall["numberOfVehiclesAffected"]);
+        eRecall.set('influencedBy', recall["influencedBy"]);
+        eRecall.set('defectConsequence', recall["defectConsequence"]);
+        eRecall.set('defectCorrectiveAction', recall["defectCorrectiveAction"]);
+        eRecall.set('defectDescription', recall["defectDescription"]);
+        //eService.set('modelYear', recall["modelYear"]); //edmunds web api string
+
+        return eRecall;
+    }
+    var recalls = [];
+
+    for (var i = 0; i < request.params.recalls.length; i++) {
+        recalls.push(createEdmundsService(request.params.recalls[i], request.params.carObject) );
+    }
+
+    Parse.Object.saveAll(recalls, {
+        success: function (data) {
+            console.log("recall saved");
+            status.success("recall saved"); // success for cloud function
+        },
+        error: function (saveError) {
+            console.log("recall not saved");
+            console.error(saveError);
+            status.error("recall not saved"); //failure for cloud function
         }
     });
 
@@ -324,6 +510,14 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         carMileage = scanMileage + car.get("baseMileage");
         }
         car.set("totalMileage", carMileage);
+
+        if (scan["freezeData"] !== undefined){
+            //exists
+            if (scan["freezeData"] !== "[]"){
+                //not empty
+                car.AddUnique("storedFreezeFrames", scan["freezeData"]);
+            }
+        }
 
         //parse dtcs and create notification
         var dtcData = scan["DTCs"];
