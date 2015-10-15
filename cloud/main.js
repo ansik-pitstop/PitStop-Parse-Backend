@@ -77,12 +77,54 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
 
 
 });
+/*
+ Car beforeSave: add recall information
+*/
+
+Parse.Cloud.beforeSave("Car", function(request){
+   // check recalls before save
+    var car = request.object;
+
+    var historyQuery = new Parse.Query("ServiceHistory");
+    historyQuery.equalTo("serviceId", 124);
+    historyQuery.equalTo("carId", car.id);
+    historyQuery.find({
+        success: function (services) {
+            //function to send services to app
+
+            var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
+
+            var recallQuery = new Parse.Query("EdmundsRecall");
+            recallQuery.notContainedIn("objectId", serviceIdStrings);
+            recallQuery.equalTo("make", car.get("make"));
+            recallQuery.equalTo("model", car.get("model"));
+            recallQuery.equalTo("year", car.get("year"));
+            recallQuery.find({
+                success: function (services) {
+                    var serviceIdStrings = services.map(function(s){return s.id;});
+                    car.set("pendingRecalls", serviceIdStrings)
+                    response.success();
+                },
+                error: function(error){
+                    response.success(); //call success anyway
+                }
+            });
+
+        },
+        error: function (error) {
+            console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
+            console.error("ERROR: ", error);
+            response.error("error with service history - car not saved");
+        }
+    });
+
+});
 
 /*
  
  Car aftersave: load calibration services
  */
- 
+
 
 Parse.Cloud.afterSave("Car", function(request){
 //first time saving the car,
@@ -90,47 +132,6 @@ Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
     //var serviceHistory = [];
   if (request.object.existed() == true){
-
-
-      var historyQuery = new Parse.Query("ServiceHistory");
-      historyQuery.equalTo("serviceId", 124);
-      historyQuery.equalTo("carId", car.id);
-      historyQuery.find({
-          success: function (services) {
-              //function to send services to app
-
-              var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
-
-              var recallQuery = new Parse.Query("EdmundsRecall");
-              recallQuery.notContainedIn("objectId", serviceIdStrings);
-              recallQuery.equalTo("make", car.get("make"));
-              recallQuery.equalTo("model", car.get("model"));
-              recallQuery.equalTo("year", car.get("year"));
-              recallQuery.find({
-                  success: function (services) {
-                      var serviceIdStrings = services.map(function(s){return s.id;});
-                      car.set("pendingRecalls", serviceIdStrings)
-                      car.save({
-                          success: function(car){
-                              console.log("car pending recalls saved");
-                          },
-                          error: function(error){
-                              console.log("car pending recall save error");
-                              console.log(error);
-                          }
-                      })
-                  },
-                  error: function(error){
-
-                  }
-              });
-
-          },
-          error: function (error) {
-              console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
-              console.error("ERROR: ", error);
-          }
-      });
 
       // making a request to Edmunds for makeModelYearId
       Parse.Cloud.httpRequest({
@@ -154,32 +155,27 @@ Parse.Cloud.afterSave("Car", function(request){
                       var edmundsRecalls = JSON.parse(results.text).recallHolder;
                       console.log("got edmunds recalls");
 
-                      for (recall in edmundsRecalls) {
 
-                      }
 
-                      //if (newRecalls){
-                          //only run this if the services are not already in table
-                          Parse.Cloud.run("addEdmundsRecalls", { //run with carServicesUpdate
-                                  recalls: edmundsRecalls,
-                                  carObject:
-                                  {
-                                      make: car.get('make'),
-                                      model: car.get('model'),
-                                      year: car.get('year')
-                                  }
-                              }, {
-                                  success: function(result){
-                                      console.log("success: ")
-                                      console.log(result)
-                                  },
-                                  error: function(error){
-                                      console.log("addEdmundsServices error:");
-                                      console.error(error);
-                                  }
+                      Parse.Cloud.run("addEdmundsRecalls", {
+                              recalls: edmundsRecalls,
+                              carObject:
+                              {
+                                  make: car.get('make'),
+                                  model: car.get('model'),
+                                  year: car.get('year')
                               }
-                          );
-                      //}
+                          }, {
+                              success: function(result){
+                                  console.log("success: ")
+                                  console.log(result)
+                              },
+                              error: function(error){
+                                  console.log("addEdmundsServices error:");
+                                  console.error(error);
+                              }
+                          }
+                      );
 
                   },
 
