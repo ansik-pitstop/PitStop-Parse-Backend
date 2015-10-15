@@ -87,11 +87,49 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
 Parse.Cloud.afterSave("Car", function(request){
 //first time saving the car,
 //set calibration services (priority = 4)
-  var car = request.object;
+    var car = request.object;
+    //var serviceHistory = [];
   if (request.object.existed() == true){
 
-      // making a request to Edmunds for makeModelYearId
 
+      var historyQuery = new Parse.Query("ServiceHistory");
+      historyQuery.equalTo("serviceId", 124);
+      historyQuery.equalTo("carId", car.id);
+      historyQuery.find({
+          success: function (services) {
+              //function to send services to app
+
+              var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
+
+              var recallQuery = new Parse.Query("EdmundsRecall");
+              recallQuery.notContainedIn("objectId", serviceIdStrings);
+              recallQuery.find({
+                  success: function (services) {
+                      var serviceIdStrings = services.map(function(s){return s.id;});
+                      car.set("pendingRecalls", serviceIdStrings)
+                      car.save({
+                          success: function(car){
+                              console.log("car pending recalls saved");
+                          },
+                          error: function(error){
+                              console.log("car pending recall save error");
+                              console.log(error);
+                          }
+                      })
+                  },
+                  error: function(error){
+
+                  }
+              });
+
+          },
+          error: function (error) {
+              console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
+              console.error("ERROR: ", error);
+          }
+      });
+
+      // making a request to Edmunds for makeModelYearId
       Parse.Cloud.httpRequest({
 
           url: EDMUNDS_API.requestPaths.makeModelYearId(
@@ -112,6 +150,10 @@ Parse.Cloud.afterSave("Car", function(request){
                   success: function (results) {
                       var edmundsRecalls = JSON.parse(results.text).recallHolder;
                       console.log("got edmunds recalls");
+
+                      for (recall in edmundsRecalls) {
+
+                      }
 
                       //if (newRecalls){
                           //only run this if the services are not already in table
