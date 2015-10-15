@@ -81,7 +81,7 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
  Car beforeSave: add recall information
 */
 
-Parse.Cloud.beforeSave("Car", function(request){
+Parse.Cloud.beforeSave("Car", function(request, response){
    // check recalls before save
     var car = request.object;
 
