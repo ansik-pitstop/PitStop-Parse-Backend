@@ -515,6 +515,14 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
         car.set("totalMileage", carMileage);
 
+        if (scan["freezeData"] !== undefined){
+            //exists
+            if (scan["freezeData"] !== "[]"){
+                //not empty
+                car.AddUnique("storedFreezeFrames", scan["freezeData"]);
+            }
+        }
+
         //parse dtcs and create notification
         var dtcData = scan["DTCs"];
         console.log("dtcs")
