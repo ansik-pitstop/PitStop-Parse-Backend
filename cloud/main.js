@@ -1,7 +1,10 @@
+var recallMasters = require("cloud/recallMasters.js");
+var sendgrid = require("sendgrid");
+sendgrid.initialize("ansik", "Ansik.23");
+
 /*
  Constants + Config
  */
-
 
 var EDMUNDS_API = {
 
@@ -121,7 +124,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
 });
 
 /*
- 
+
  Car aftersave: load calibration services
  */
 
@@ -131,73 +134,89 @@ Parse.Cloud.afterSave("Car", function(request){
 //set calibration services (priority = 4)
     var car = request.object;
     //var serviceHistory = [];
-  if (request.object.existed() == true){
 
-      // making a request to Edmunds for makeModelYearId
-      Parse.Cloud.httpRequest({
+    // check Recall Masters and add records related to this car
+    var query = new Parse.Query("RecallMasters")
+    query.equalTo("vin", car.get("VIN"))
+    query.first({
+        success: function(result) {
+            if (result === undefined) {
+                Parse.Cloud.run("recallMastersWrapper", { "vin": car.get("VIN") });
+            }
+        }
+    })
 
-          url: EDMUNDS_API.requestPaths.makeModelYearId(
-              car.get('make'),
-              car.get('model'),
-              car.get('year')
-          ),
+  // *** Edmunds is no longer used ***
 
-          success: function (results) {
+  //   if (!request.object.existed()){
+  //
+  // // if (!request.object.existed()){
+  //
+  //      // making a request to Edmunds for makeModelYearId
+  //     Parse.Cloud.httpRequest({
+  //
+  //         url: EDMUNDS_API.requestPaths.makeModelYearId(
+  //             car.get('make'),
+  //             car.get('model'),
+  //             car.get('year')
+  //         ),
+  //
+  //         success: function (results) {
+  //
+  //             carMakeModelYearId = JSON.parse(results.text).id;
+  //
+  //             // saving recalls to database
+  //             Parse.Cloud.httpRequest({
+  //
+  //                 url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
+  //
+  //                 success: function (results) {
+  //                     var edmundsRecalls = JSON.parse(results.text).recallHolder;
+  //                     console.log("got edmunds recalls");
+  //
+  //
+  //
+  //                     Parse.Cloud.run("addEdmundsRecalls", {
+  //                             recalls: edmundsRecalls,
+  //                             carObject:
+  //                             {
+  //                                 make: car.get('make'),
+  //                                 model: car.get('model'),
+  //                                 year: car.get('year')
+  //                             }
+  //                         }, {
+  //                             success: function(result){
+  //                                 console.log("success: ")
+  //                                 console.log(result)
+  //                             },
+  //                             error: function(error){
+  //                                 console.log("addEdmundsServices error:");
+  //                                 console.error(error);
+  //                             }
+  //                         }
+  //                     );
+  //
+  //                 },
+  //
+  //                 error: function (error) {
+  //                     console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
+  //                     console.error(error);
+  //                 }
+  //
+  //             });
+  //
+  //         },
+  //
+  //         error: function (error) {
+  //             console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
+  //             console.error("ERROR: ", error);
+  //         }
+  //
+  //     });
+  //
+  //     return;
+  // }
 
-              carMakeModelYearId = JSON.parse(results.text).id;
-
-              // saving recalls to database
-              Parse.Cloud.httpRequest({
-
-                  url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
-
-                  success: function (results) {
-                      var edmundsRecalls = JSON.parse(results.text).recallHolder;
-                      console.log("got edmunds recalls");
-
-
-
-                      Parse.Cloud.run("addEdmundsRecalls", {
-                              recalls: edmundsRecalls,
-                              carObject:
-                              {
-                                  make: car.get('make'),
-                                  model: car.get('model'),
-                                  year: car.get('year')
-                              }
-                          }, {
-                              success: function(result){
-                                  console.log("success: ")
-                                  console.log(result)
-                              },
-                              error: function(error){
-                                  console.log("addEdmundsServices error:");
-                                  console.error(error);
-                              }
-                          }
-                      );
-
-                  },
-
-                  error: function (error) {
-                      console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
-                      console.error(error);
-                  }
-
-              });
-
-          },
-
-          error: function (error) {
-              console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
-              console.error("ERROR: ", error);
-          }
-
-      });
-
-      return;
-  }
-                      
   var query = new Parse.Query("Service");
   query.equalTo("priority", 4);
   query.find({
@@ -207,7 +226,7 @@ Parse.Cloud.afterSave("Car", function(request){
              servicesDue = [];
              console.log('services');
              console.log(services);
-             
+
              for (var i = 0; i < serviceStack.length; i++) {
                 var service = serviceStack[i];
                 if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
@@ -223,8 +242,8 @@ Parse.Cloud.afterSave("Car", function(request){
                       console.error(saveError);
                       }
                       });
-             
-             
+
+
              },
              error: function (error) {
              console.error("Could not find services with priority = ", 4);
@@ -300,7 +319,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
 
 });
 
-  
+
 
 Parse.Cloud.afterSave("Notification", function(request) {
   //push notification
@@ -1178,6 +1197,132 @@ Parse.Cloud.job("carServiceUpdateJob", function(request, status){
             }
         });
     };
-
-
 });
+
+Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
+   var params = request.params
+   var services = params.services;
+   var carVin = params.carVin;
+   var userObjectId = params.userObjectId;
+   var comments = params.comments;
+
+   function sendEmail (user, car, shop) {
+      var emailHtml = "<h2>Customer Information</h2>"
+      emailHtml += "<br>"
+      emailHtml += "<strong>Service Request By:</strong> " + user.get("name")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Customer's Phone Number:</strong> " + user.get("phoneNumber")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Vehicle:</strong> " + car.get("make") + " " + car.get("model")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Vehicle Year:</strong> " + car.get("year")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Vehicle VIN:</strong> " + car.get("VIN")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Vehicle Engine:</strong> " + car.get("engine")
+      emailHtml += "<br>"
+      emailHtml += "<strong>Vehicle Mileage:</strong> " + car.get("totalMileage")
+      emailHtml += "<br>"
+
+      emailHtml += "<h2>Required Services</h2>"
+      emailHtml += "<br>"
+      emailHtml += "<ul>"
+
+      for (i=0; i < services.length; i++) {
+         emailHtml += "<li>"
+         emailHtml += services[i]["action"] + " " + services[i]["item"]
+
+         if (services[i]["priority"] == 5) {
+            // DTC, add description
+            emailHtml += "<br>" + services[i]["itemDescription"]
+         }
+         emailHtml += "</li>"
+      }
+      emailHtml += "</ul>"
+      emailHtml += "<br>"
+      emailHtml += "<h2>Additional Comments</h2>"
+      emailHtml += "<br>"
+      emailHtml += comments
+
+      // Add FF here
+      /*emailHtml += "<ul>"
+      emailHtml += ("<br><strong>Freeze Frame</strong>")
+      emailHtml += ("<li>" + "Trouble Code:       P0442</li>")
+      emailHtml += ("<li>" + "Fuel System 1:      Open1</li>")
+      emailHtml += ("<li>" + "Fuel System 2:      Open1</li>")
+      emailHtml += ("<li>" + "Calc Load (%):          0</li>")
+      emailHtml += ("<li>" + "Coolant (C):           84</li>")
+      emailHtml += ("<li>" + "ST Fuel Trim 1 (%):     0</li>")
+      emailHtml += ("<li>" + "LT Fuel Trim 1 (%):  -7.0</li>")
+      emailHtml += ("<li>" + "ST Fuel Trim 2 (%):     0</li>")
+      emailHtml += ("<li>" + "LT Fuel Trim 2 (%):  -9.4</li>")
+      emailHtml += ("<li>" + "Engine Speed (rpm):     0</li>")
+      emailHtml += ("<li>" + "Vehicle Speed (km/h):   0</li>")
+      emailHtml += ("<li>" + "Ignition Advance:       6</li>")
+      emailHtml += ("<li>" + "Intake Air Temp (C):   39</li>")
+      emailHtml += ("<li>" + "Mass Air Flow (g/s): 2.26</li>")
+      emailHtml += ("<li>" + "Absolute TPS (%):    17.6</li>")
+      emailHtml += "<br></ul>"*/
+
+      console.log("sendEmail html");
+      console.log(emailHtml);
+      
+      sendgrid.sendEmail({
+        to: "thebe@ansik.ca",
+        from: user.get("email"),
+        subject: "Service Request from " + user.get("name"),
+        html: emailHtml
+      }, {
+         success: function(httpResponse) {
+            console.log(httpResponse);
+            console.log("Email sent!");
+            response.success("Email sent!");
+         },
+         error: function(httpResponse) {
+            console.error(httpResponse)
+            console.log("Error sending email");
+            response.error("Error sending email")
+         }
+      });
+   }
+
+   userQuery = new Parse.Query(Parse.User);
+   userQuery.equalTo("objectId", userObjectId);
+   userQuery.find({
+      success: function (users) {
+         user = users[0]
+
+         shopQuery = new Parse.Query("Shop");
+         shopQuery.equalTo("objectId", user.get("subscribedShop"))
+         shopQuery.find({
+            success: function (shops) {
+               shop = shops[0]
+               console.log("Shop "); console.log(shop);
+               
+               var carQuery = new Parse.Query("Car")
+               carQuery.equalTo("VIN", carVin)
+               carQuery.find({
+                  success: function (cars) {
+                     car = cars[0]
+                     console.log("Car "); console.log(car);
+                     sendEmail (user, car, shop);
+                  },
+                  error: function (error) {
+                     console.error(error)
+                     response.error()
+                  }
+               });
+            },
+            error: function (error) {
+              console.log("Error " + error)
+              response.error()
+            }
+         });
+      },
+      error: function (error) {
+         console.error(error)
+         response.error()
+      }
+   });
+});
+
