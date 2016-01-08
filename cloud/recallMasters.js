@@ -193,29 +193,32 @@ Parse.Cloud.define("addRecallMastersResult", function(request, response) {
         var RecallMasters = Parse.Object.extend("RecallMasters")
         var newEntry = new RecallMasters()
 
-        // recalls is an arrary of NHTSA IDs for decoupling purpose
-        var recalls = []
 
-        if (recallMastersObject["recall_count"] > 0) {
+        // NOTE: recalls are now saved as nested an array of json - Jan. 7, 2016 - Jiawei
 
-            for (var i = 0; i < recallMastersObject["recalls"].length; i++) {
-                var currObject = recallMastersObject["recalls"][i]
-                // update the recall entry when adding a new recall record to the array
-                // assign the pointer to updated recall entry to recall list
-                recalls.push(currObject["nhtsa_id"])
-
-                Parse.Cloud.run("updateRecallEntry", currObject)
-            }
-        }
+        // // recalls is an arrary of NHTSA IDs for decoupling purpose
+        // var recalls = []
+        //
+        // if (recallMastersObject["recall_count"] > 0) {
+        //
+        //     for (var i = 0; i < recallMastersObject["recalls"].length; i++) {
+        //         var currObject = recallMastersObject["recalls"][i]
+        //         // update the recall entry when adding a new recall record to the array
+        //         // assign the pointer to updated recall entry to recall list
+        //         recalls.push(currObject["nhtsa_id"])
+        //
+        //         Parse.Cloud.run("updateRecallEntry", currObject)
+        //     }
+        // }
 
         newEntry.set("vin", recallMastersObject["vin"])
         newEntry.set("make", recallMastersObject["make"])
         newEntry.set("modelName", recallMastersObject["model_name"])
         newEntry.set("modelYear", recallMastersObject["model_year"])
-        newEntry.set("recalls", recalls)
+        newEntry.set("recalls", recallMastersObject["recalls"])
         // isAddingFinished: flag to make sure recall ids are replaced with ptr to objects in RecallEntry and it is done only once
         // TODO: when RM API lookup updates are enabled, set the flag to false if there is a new successful API lookup
-        newEntry.set("isAddingFinished", false)
+        // newEntry.set("isAddingFinished", false)
 
         return newEntry
     }
@@ -278,59 +281,80 @@ Parse.Cloud.define("recallMastersWrapper", function(request, response) {
 })
 
 
-Parse.Cloud.afterSave("RecallMasters", function(request) {
-    // add pointer to current object into related car entry
-
+Parse.Cloud.beforeSave("RecallMasters", function(request, response) {
     var recallMasters = request.object
-    var objectId = recallMasters.id
 
     var query = new Parse.Query("Car")
     query.equalTo("VIN", recallMasters.get("vin"))
 
-    query.first({
-        success: function(carObject) {
-            console.log(carObject.get("recallMastersPointer"))
-            if (carObject !== undefined && carObject.get("recallMastersPointer") === undefined) {
-                    carObject.set("recallMastersPointer", recallMasters)
-                    carObject.save()
+    query.first().then(
+        function(carObject) {
+            if (carObject !== undefined) {
+                recallMasters.set("forCar", carObject)
+                response.success()
             }
         },
-        error: function(error) {
-            console.log(error)
+        function(error) {
+            console.error("cannot save Recall Masters result - no matching car found")
+            response.error(error)
         }
-    })
-
-    // replace recall entries with ptrs to entries
-    var recallEntryPtrs = []
-    var isAddingFinished = recallMasters.get("isAddingFinished")
-    var recalls = recallMasters.get("recalls")
-
-    if (!recallMasters.get("isAddingFinished")) {
-        // replace strings of nhtsa ids with pointers for only once
-
-        Query = new Parse.Query("RecallEntry")
-        Query.containedIn("nhtsaID", recalls)
-        Query.find({
-            success: function(result) {
-                if ((result === undefined && recalls.length !== 0) || (result.length !== recalls.length)) {
-                    console.log("Unexpected error - number of recall objects does not match when replacing recall entries with ptrs")
-                }
-                else {
-                    for (i = 0; i < result.length; i++) {
-                        recallEntryPtrs.push(result[i])
-                    }
-
-                    recallMasters.set("recalls", recallEntryPtrs)
-                    recallMasters.set("isAddingFinished", true)
-
-                    recallMasters.save(null)
-
-                    console.log("successfully replaced recall entries with ptrs")
-                }
-            }
-        })
-    }
+    )
 })
+
+
+// Parse.Cloud.afterSave("RecallMasters", function(request) {
+//     // add pointer to current object into related car entry
+//
+//     var recallMasters = request.object
+//     var objectId = recallMasters.id
+//
+//     var query = new Parse.Query("Car")
+//     query.equalTo("VIN", recallMasters.get("vin"))
+//
+//     query.first({
+//         success: function(carObject) {
+//             console.log(carObject.get("recallMastersPointer"))
+//             if (carObject !== undefined && carObject.get("recallMastersPointer") === undefined) {
+//                     carObject.set("recallMastersPointer", recallMasters)
+//                     carObject.save()
+//             }
+//         },
+//         error: function(error) {
+//             console.log(error)
+//         }
+//     })
+//
+//     // replace recall entries with ptrs to entries
+//     var recallEntryPtrs = []
+//     var isAddingFinished = recallMasters.get("isAddingFinished")
+//     var recalls = recallMasters.get("recalls")
+//
+//     if (!recallMasters.get("isAddingFinished")) {
+//         // replace strings of nhtsa ids with pointers for only once
+//
+//         Query = new Parse.Query("RecallEntry")
+//         Query.containedIn("nhtsaID", recalls)
+//         Query.find({
+//             success: function(result) {
+//                 if ((result === undefined && recalls.length !== 0) || (result.length !== recalls.length)) {
+//                     console.log("Unexpected error - number of recall objects does not match when replacing recall entries with ptrs")
+//                 }
+//                 else {
+//                     for (i = 0; i < result.length; i++) {
+//                         recallEntryPtrs.push(result[i])
+//                     }
+//
+//                     recallMasters.set("recalls", recallEntryPtrs)
+//                     recallMasters.set("isAddingFinished", true)
+//
+//                     recallMasters.save(null)
+//
+//                     console.log("successfully replaced recall entries with ptrs")
+//                 }
+//             }
+//         })
+//     }
+// })
 
 
 Parse.Cloud.job("addRecallMastersResultByVIN", function(request, response) {

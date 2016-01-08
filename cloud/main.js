@@ -121,6 +121,33 @@ Parse.Cloud.beforeSave("Car", function(request, response){
         }
     });
 
+    // was in afterSave for car - think this should be done in beforeSave - Jiawei
+
+    var query = new Parse.Query("Service");
+    query.equalTo("priority", 4);
+    query.find({
+        success: function (services) {
+            //function to send services to app
+            serviceStack = services;
+            servicesDue = [];
+            console.log('services');
+            console.log(services)
+
+            for (var i = 0; i < serviceStack.length; i++) {
+                var service = serviceStack[i];
+                if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+            }
+            car.set("serviceDue", true);
+            car.set("servicesDue", servicesDue);
+        },
+        error: function (error) {
+            console.error("Could not find services with priority = ", 4);
+            console.error("ERROR: ", error);
+        }
+    });
+
+
+
 });
 
 /*
@@ -133,18 +160,9 @@ Parse.Cloud.afterSave("Car", function(request){
 //first time saving the car,
 //set calibration services (priority = 4)
     var car = request.object;
-    //var serviceHistory = [];
+    // var serviceHistory = [];
 
-    // check Recall Masters and add records related to this car
-    var query = new Parse.Query("RecallMasters")
-    query.equalTo("vin", car.get("VIN"))
-    query.first({
-        success: function(result) {
-            if (result === undefined) {
-                Parse.Cloud.run("recallMastersWrapper", { "vin": car.get("VIN") });
-            }
-        }
-    })
+    Parse.Cloud.run("recallMastersWrapper", { "vin": car.get("VIN") });
 
   // *** Edmunds is no longer used ***
 
@@ -217,39 +235,39 @@ Parse.Cloud.afterSave("Car", function(request){
   //     return;
   // }
 
-  var query = new Parse.Query("Service");
-  query.equalTo("priority", 4);
-  query.find({
-             success: function (services) {
-             //function to send services to app
-             serviceStack = services;
-             servicesDue = [];
-             console.log('services');
-             console.log(services);
-
-             for (var i = 0; i < serviceStack.length; i++) {
-                var service = serviceStack[i];
-                if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
-             }
-             car.set("serviceDue", true);
-             car.set("servicesDue", servicesDue);
-             car.save(null, {
-                      success: function (savedCar) {
-                      console.log("car saved");
-                      },
-                      error: function (saveError) {
-                      console.log("car not saved");
-                      console.error(saveError);
-                      }
-                      });
-
-
-             },
-             error: function (error) {
-             console.error("Could not find services with priority = ", 4);
-             console.error("ERROR: ", error);
-             }
-             });
+  // var query = new Parse.Query("Service");
+  // query.equalTo("priority", 4);
+  // query.find({
+  //            success: function (services) {
+  //            //function to send services to app
+  //            serviceStack = services;
+  //            servicesDue = [];
+  //            console.log('services');
+  //            console.log(services);
+  //
+  //            for (var i = 0; i < serviceStack.length; i++) {
+  //               var service = serviceStack[i];
+  //               if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+  //            }
+  //            car.set("serviceDue", true);
+  //            car.set("servicesDue", servicesDue);
+  //            car.save(null, {
+  //                     success: function (savedCar) {
+  //                     console.log("car saved");
+  //                     },
+  //                     error: function (saveError) {
+  //                     console.log("car not saved");
+  //                     console.error(saveError);
+  //                     }
+  //                     });
+  //
+  //
+  //            },
+  //            error: function (error) {
+  //            console.error("Could not find services with priority = ", 4);
+  //            console.error("ERROR: ", error);
+  //            }
+  //            });
 
 
 
@@ -1266,7 +1284,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
 
       console.log("sendEmail html");
       console.log(emailHtml);
-      
+
       sendgrid.sendEmail({
         to: "thebe@ansik.ca",
         from: user.get("email"),
@@ -1298,7 +1316,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
             success: function (shops) {
                shop = shops[0]
                console.log("Shop "); console.log(shop);
-               
+
                var carQuery = new Parse.Query("Car")
                carQuery.equalTo("VIN", carVin)
                carQuery.find({
@@ -1325,4 +1343,3 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       }
    });
 });
-
