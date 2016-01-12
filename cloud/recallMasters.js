@@ -34,6 +34,7 @@ Parse.Cloud.define("addUncheckedVIN", function(request, response) {
                 var newEntry = new UncheckedVIN()
 
                 newEntry.set("vin", request.params.vin)
+                newEntry.set("message", request.params.error_description)
 
                 newEntry.save(null, {
                     success: function() {
@@ -62,6 +63,12 @@ Parse.Cloud.define("addUncheckedVIN", function(request, response) {
 
 
 Parse.Cloud.define("getRecallMastersResult", function(request, response) {
+    var isValid = function(data) {
+        // VIN in considered valid if make, model name and model year are non-empty strings in API response
+        return (data.make && data.model_name && data.model_year)
+
+    }
+
     var req = RecallMastersAPI.getRequestByVIN(request.params.vin)
 
     Parse.Cloud.httpRequest({
@@ -80,7 +87,7 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
 
                 // handles 400 bad request
 
-                if (errCode = 400) {
+                if (errCode = 400 && (isValid(error.data))) {
                     Parse.Cloud.run("addUncheckedVIN", request.params, {
                         success: function(result) {
                             response.success("VIN " + request.params.vin + " " + "is recorded")
@@ -183,17 +190,8 @@ Parse.Cloud.define("updateRecallEntry", function(request, response) {
 })
 
 
-Parse.Cloud.define("addRecallMastersResult", function(request, response) {
-    // TODO: add a boolean field like isUpdateRequired to let the function determine
-    // whether an existing entry needs to be updated with new result
-    //
-    // or add code that compares the items in the recalls field
-
-    var createNewEntry = function(recallMastersObject) {
-        var RecallMasters = Parse.Object.extend("RecallMasters")
-        var newEntry = new RecallMasters()
-
-
+Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
+    var doUpdate = function(entry, recallMastersObject, isEntryExisting) {
         // NOTE: recalls are now saved as nested an array of json - Jan. 7, 2016 - Jiawei
 
         // // recalls is an arrary of NHTSA IDs for decoupling purpose
@@ -211,60 +209,66 @@ Parse.Cloud.define("addRecallMastersResult", function(request, response) {
         //     }
         // }
 
-        newEntry.set("vin", recallMastersObject["vin"])
-        newEntry.set("make", recallMastersObject["make"])
-        newEntry.set("modelName", recallMastersObject["model_name"])
-        newEntry.set("modelYear", recallMastersObject["model_year"])
-        newEntry.set("recalls", recallMastersObject["recalls"])
+        entry.set("vin", recallMastersObject["vin"])
+        entry.set("make", recallMastersObject["make"])
+        entry.set("modelName", recallMastersObject["model_name"])
+        entry.set("modelYear", recallMastersObject["model_year"])
+        entry.set("recalls", recallMastersObject["recalls"])
         // isAddingFinished: flag to make sure recall ids are replaced with ptr to objects in RecallEntry and it is done only once
         // TODO: when RM API lookup updates are enabled, set the flag to false if there is a new successful API lookup
         // newEntry.set("isAddingFinished", false)
 
-        return newEntry
+        entry.save().then(function() {
+            if (isEntryExisting) {
+                response.success("Recall Master's result for VIN #" + recallMastersObject["vin"] + " is updated")
+            }
+            else {
+                response.success("Recall Master's result for VIN #" + recallMastersObject["vin"] + " is added")
+            }
+        }).catch(
+            function(error) {
+                message = "Recall Master's result for VIN #" + recallMastersObject["vin"] + " cannot be saved"
+                response.error(error)
+            }
+        )
     }
 
-    var isEntryExisting = undefined
     var recallMastersObject = request.params
+    var isEntryExisting = undefined
 
     var query = new Parse.Query("RecallMasters")
-
     query.equalTo("vin", recallMastersObject["vin"])
 
     query.first({
         success: function(result) {
-            if (result !== undefined) {
-                // entry found - do not add duplicate result
-                var message = "Entry with VIN #" + request.params.vin + " is found - no entry added."
-                // console.log(message)
-                // response.error(Parse.Error.OTHER_CAUSE, message)
-                response.error(message)
+            isEntryExisting = (result !== undefined)
+            if (isEntryExisting) {
+                // entry found - use the existing entry
+                entry = result
             }
             else {
-                // entry not found - create and save new RM record
-                var entry = createNewEntry(recallMastersObject)
+                // entry not found - create a new entry
+                var RecallMastersEntry = Parse.Object.extend("RecallMasters")
+                var newEntry = new RecallMastersEntry()
 
-                entry.save(null, {
-                    success: function() {
-                        response.success("Recall Master's result for VIN #" + request.params.vin + " is added")
-                    },
-                    error: function(error) {
-                        console.log("Recall Master's result for VIN #" + request.params.vin + " cannot be saved")
-                        console.log(error)
-                        response.error(error)
-                    }
-                })
+                entry = newEntry
             }
+
+            doUpdate(entry, recallObject, isEntryExisting)
         },
         error: function(error) {
+            console.log(error)
             response.error(error)
+
         }
     })
 })
 
+
 Parse.Cloud.define("recallMastersWrapper", function(request, response) {
     Parse.Cloud.run("getRecallMastersResult", request.params, {
         success: function(result) {
-            Parse.Cloud.run("addRecallMastersResult", result.data, {
+            Parse.Cloud.run("updateRecallMastersResult", result.data, {
                 success: function(result) {
                     response.success(result)
                 },
