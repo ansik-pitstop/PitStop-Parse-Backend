@@ -79,7 +79,8 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
         },
 
         error: function(error) {
-            console.log("Recall lookup failed for VIN #" + request.params.vin)
+            var message = "Recall lookup failed for VIN #" + request.params.vin
+            console.log(message)
             try {
                 errCode = error.status
 
@@ -87,20 +88,26 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
 
                 // handles 400 bad request
 
-                if (errCode = 400 && (isValid(error.data))) {
-                    Parse.Cloud.run("addUncheckedVIN", request.params, {
-                        success: function(result) {
-                            response.success("VIN " + request.params.vin + " " + "is recorded")
-                        },
+                if (errCode = 400) {
+                    if (isValid(error.data)) {
+                        Parse.Cloud.run("addUncheckedVIN", request.params, {
+                            success: function(result) {
+                                response.success("VIN " + request.params.vin + " " + "is recorded")
+                            },
 
-                        error: function(error) {
-                            console.log("VIN " + request.params.vin + " " + "cannot be recorded")
-                            response.error(error)
-                        }
-                    })
+                            error: function(error) {
+                                console.log("VIN " + request.params.vin + " " + "cannot be recorded")
+                                response.error(error)
+                            }
+                        })
+                    }
+                    else {
+                        message = "VIN " + request.params.vin + " " + "is invalid and is not added into UncheckedVIN"
+                        console.log(message)
+                    }
                 }
                 else {
-                    var message = "Recall lookup failed - error code: " + errCode
+                    message = "Recall lookup failed - error code: " + errCode
                     // console.log(message)
                     // response.error(Parse.Error.OTHER_CAUSE, message)
                     response.error(message)
@@ -108,11 +115,12 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
             }
 
             catch(err) {
-                console.log("Recall lookup failed - unexpected result from RecallMasters")
+                message = "Recall lookup failed - unexpected result from RecallMasters"
+                console.log(message)
                 console.log(err)
             }
 
-            response.error(error)
+            response.error(message)
         }
     })
 })
@@ -225,7 +233,8 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
             else {
                 response.success("Recall Master's result for VIN #" + recallMastersObject["vin"] + " is added")
             }
-        }).catch(
+        // error handling
+        }).then(function() {},
             function(error) {
                 message = "Recall Master's result for VIN #" + recallMastersObject["vin"] + " cannot be saved"
                 response.error(error)
@@ -254,7 +263,7 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
                 entry = newEntry
             }
 
-            doUpdate(entry, recallObject, isEntryExisting)
+            doUpdate(entry, recallMastersObject, isEntryExisting)
         },
         error: function(error) {
             console.log(error)
@@ -287,6 +296,14 @@ Parse.Cloud.define("recallMastersWrapper", function(request, response) {
 
 Parse.Cloud.beforeSave("RecallMasters", function(request, response) {
     var recallMasters = request.object
+
+    // TODO: hidden bug: RecallMasters entry is linked back to Car by checking VIN, rather than linking to the Car entry that
+    // caused the lookup request
+    //
+    // possible solution: save pointer to the Car object by updateRecallMastersResult
+    // i.e. pass the pointer to the parent objects when sending requests and pocess it in beforeSave of child classes
+    // also a solution for future implements - beforeSave doesn't know by whom it is triggered, need to keep that info
+    // when creating objects
 
     var query = new Parse.Query("Car")
     query.equalTo("VIN", recallMasters.get("vin"))
