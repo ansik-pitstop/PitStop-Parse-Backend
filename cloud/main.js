@@ -123,28 +123,32 @@ Parse.Cloud.beforeSave("Car", function(request, response){
 
     // was in afterSave for car - think this should be done in beforeSave - Jiawei
 
-    var query = new Parse.Query("Service");
-    query.equalTo("priority", 4);
-    query.find({
-        success: function (services) {
-            //function to send services to app
-            serviceStack = services;
-            servicesDue = [];
-            console.log('services');
-            console.log(services)
+    // puttig this part of code after checking isNew() to ensure it runs once only
 
-            for (var i = 0; i < serviceStack.length; i++) {
-                var service = serviceStack[i];
-                if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+    if (request.object.isNew()) {
+        var query = new Parse.Query("Service");
+        query.equalTo("priority", 4);
+        query.find({
+            success: function (services) {
+                //function to send services to app
+                serviceStack = services;
+                servicesDue = [];
+                console.log('services');
+                console.log(services)
+
+                for (var i = 0; i < serviceStack.length; i++) {
+                    var service = serviceStack[i];
+                    if (servicesDue.indexOf(service.get("serviceId")) === -1) servicesDue.push(service.get("serviceId"));
+                }
+                car.set("serviceDue", true);
+                car.set("servicesDue", servicesDue);
+            },
+            error: function (error) {
+                console.error("Could not find services with priority = ", 4);
+                console.error("ERROR: ", error);
             }
-            car.set("serviceDue", true);
-            car.set("servicesDue", servicesDue);
-        },
-        error: function (error) {
-            console.error("Could not find services with priority = ", 4);
-            console.error("ERROR: ", error);
-        }
-    });
+        });
+    }
 
 
 
@@ -162,7 +166,19 @@ Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
     // var serviceHistory = [];
 
-    Parse.Cloud.run("recallMastersWrapper", { "vin": car.get("VIN") });
+    var createdAt = request.object.get("createdAt");
+    var updatedAt = request.object.get("updatedAt");
+    var objectExisted = (createdAt.getTime() != updatedAt.getTime());
+
+    var isExisted = (request.object.existed() || objectExisted)
+
+    if (!isExisted) {
+        Parse.Cloud.run("recallMastersWrapper", {
+            "vin": car.get("VIN"),
+            // passing in the id string, not pointer to car object
+            "car": car.id
+        })
+    }
 
   // *** Edmunds is no longer used ***
 

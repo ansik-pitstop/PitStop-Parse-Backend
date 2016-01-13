@@ -41,21 +41,21 @@ Parse.Cloud.define("addUncheckedVIN", function(request, response) {
                         response.success("unchecked VIN added")
                     },
                     error: function(error) {
-                        console.log("unchecked VIN #" + request.params.vin + " cannot be added")
+                        console.log("unchecked VIN" + request.params.vin + " cannot be added")
                         response.error(error)
                     }
                 })
             }
             else {
                 // VIN exists, no record added
-                var message = "unchecked VIN #" + request.params.vin + " is in queue - no entry added"
+                var message = "unchecked VIN" + request.params.vin + " is in queue - no entry added"
                 // console.log(message)
                 // response.error(Parse.Error.OTHER_CAUSE, message)
                 response.error(message)
             }
         },
         error: function(error) {
-            console.log("unchecked VIN #" + request.params.vin + " cannot be added")
+            console.log("unchecked VIN" + request.params.vin + " cannot be added")
             response.error(error)
         }
     })
@@ -79,7 +79,7 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
         },
 
         error: function(error) {
-            var message = "Recall lookup failed for VIN #" + request.params.vin
+            var message = "Recall lookup failed for VIN" + request.params.vin
             console.log(message)
             try {
                 errCode = error.status
@@ -222,31 +222,48 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
         entry.set("modelName", recallMastersObject["model_name"])
         entry.set("modelYear", recallMastersObject["model_year"])
         entry.set("recalls", recallMastersObject["recalls"])
-        // isAddingFinished: flag to make sure recall ids are replaced with ptr to objects in RecallEntry and it is done only once
-        // TODO: when RM API lookup updates are enabled, set the flag to false if there is a new successful API lookup
-        // newEntry.set("isAddingFinished", false)
 
-        entry.save().then(function() {
-            if (isEntryExisting) {
-                response.success("Recall Master's result for VIN #" + recallMastersObject["vin"] + " is updated")
+        // find car object by id
+        query = new Parse.Query("Car")
+        query.equalTo("objectId", recallMastersObject["car"])
+        query.first().then(function(carObject) {
+            if (carObject !== undefined) {
+                // car object found
+                entry.set("forCar", carObject)
             }
             else {
-                response.success("Recall Master's result for VIN #" + recallMastersObject["vin"] + " is added")
+                message = "Car object with id " + recallMastersObject["car"] + " not found"
+                response.error(message)
             }
+        }).then(function() {
+            // all attrs are set - save the object
+            entry.save().then(function() {
+                if (isEntryExisting) {
+                    response.success("Recall Master's result for VIN" + recallMastersObject["vin"] + " is updated")
+                }
+                else {
+                    response.success("Recall Master's result for VIN" + recallMastersObject["vin"] + " is added")
+                }
+            })
         // error handling
-        }).then(function() {},
-            function(error) {
-                message = "Recall Master's result for VIN #" + recallMastersObject["vin"] + " cannot be saved"
-                response.error(error)
-            }
-        )
+        }).then(function() {}, function(error) {
+            message = "query on Car object failed"
+            console.error(message)
+            response.error(error)
+        })
     }
 
     var recallMastersObject = request.params
     var isEntryExisting = undefined
 
+    var pointerToCar = {
+        "__type": "Pointer",
+        "className": "Car",
+        "objectId": recallMastersObject["car"]
+    }
+
     var query = new Parse.Query("RecallMasters")
-    query.equalTo("vin", recallMastersObject["vin"])
+    query.equalTo("forCar", pointerToCar)
 
     query.first({
         success: function(result) {
@@ -277,7 +294,9 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
 Parse.Cloud.define("recallMastersWrapper", function(request, response) {
     Parse.Cloud.run("getRecallMastersResult", request.params, {
         success: function(result) {
-            Parse.Cloud.run("updateRecallMastersResult", result.data, {
+            data = result.data
+            data["car"] = request.params.car
+            Parse.Cloud.run("updateRecallMastersResult", data, {
                 success: function(result) {
                     response.success(result)
                 },
@@ -292,90 +311,6 @@ Parse.Cloud.define("recallMastersWrapper", function(request, response) {
         }
     })
 })
-
-
-Parse.Cloud.beforeSave("RecallMasters", function(request, response) {
-    var recallMasters = request.object
-
-    // TODO: hidden bug: RecallMasters entry is linked back to Car by checking VIN, rather than linking to the Car entry that
-    // caused the lookup request
-    //
-    // possible solution: save pointer to the Car object by updateRecallMastersResult
-    // i.e. pass the pointer to the parent objects when sending requests and pocess it in beforeSave of child classes
-    // also a solution for future implements - beforeSave doesn't know by whom it is triggered, need to keep that info
-    // when creating objects
-
-    var query = new Parse.Query("Car")
-    query.equalTo("VIN", recallMasters.get("vin"))
-
-    query.first().then(
-        function(carObject) {
-            if (carObject !== undefined) {
-                recallMasters.set("forCar", carObject)
-                response.success()
-            }
-        },
-        function(error) {
-            console.error("cannot save Recall Masters result - no matching car found")
-            response.error(error)
-        }
-    )
-})
-
-
-// Parse.Cloud.afterSave("RecallMasters", function(request) {
-//     // add pointer to current object into related car entry
-//
-//     var recallMasters = request.object
-//     var objectId = recallMasters.id
-//
-//     var query = new Parse.Query("Car")
-//     query.equalTo("VIN", recallMasters.get("vin"))
-//
-//     query.first({
-//         success: function(carObject) {
-//             console.log(carObject.get("recallMastersPointer"))
-//             if (carObject !== undefined && carObject.get("recallMastersPointer") === undefined) {
-//                     carObject.set("recallMastersPointer", recallMasters)
-//                     carObject.save()
-//             }
-//         },
-//         error: function(error) {
-//             console.log(error)
-//         }
-//     })
-//
-//     // replace recall entries with ptrs to entries
-//     var recallEntryPtrs = []
-//     var isAddingFinished = recallMasters.get("isAddingFinished")
-//     var recalls = recallMasters.get("recalls")
-//
-//     if (!recallMasters.get("isAddingFinished")) {
-//         // replace strings of nhtsa ids with pointers for only once
-//
-//         Query = new Parse.Query("RecallEntry")
-//         Query.containedIn("nhtsaID", recalls)
-//         Query.find({
-//             success: function(result) {
-//                 if ((result === undefined && recalls.length !== 0) || (result.length !== recalls.length)) {
-//                     console.log("Unexpected error - number of recall objects does not match when replacing recall entries with ptrs")
-//                 }
-//                 else {
-//                     for (i = 0; i < result.length; i++) {
-//                         recallEntryPtrs.push(result[i])
-//                     }
-//
-//                     recallMasters.set("recalls", recallEntryPtrs)
-//                     recallMasters.set("isAddingFinished", true)
-//
-//                     recallMasters.save(null)
-//
-//                     console.log("successfully replaced recall entries with ptrs")
-//                 }
-//             }
-//         })
-//     }
-// })
 
 
 Parse.Cloud.job("addRecallMastersResultByVIN", function(request, response) {
