@@ -41,21 +41,21 @@ Parse.Cloud.define("addUncheckedVIN", function(request, response) {
                         response.success("unchecked VIN added")
                     },
                     error: function(error) {
-                        console.log("unchecked VIN" + request.params.vin + " cannot be added")
+                        console.log("unchecked VIN " + request.params.vin + " cannot be added")
                         response.error(error)
                     }
                 })
             }
             else {
                 // VIN exists, no record added
-                var message = "unchecked VIN" + request.params.vin + " is in queue - no entry added"
+                var message = "unchecked VIN " + request.params.vin + " is in queue - no entry added"
                 // console.log(message)
                 // response.error(Parse.Error.OTHER_CAUSE, message)
                 response.error(message)
             }
         },
         error: function(error) {
-            console.log("unchecked VIN" + request.params.vin + " cannot be added")
+            console.log("unchecked VIN " + request.params.vin + " cannot be added")
             response.error(error)
         }
     })
@@ -79,7 +79,7 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
         },
 
         error: function(error) {
-            var message = "Recall lookup failed for VIN" + request.params.vin
+            var message = "Recall lookup failed for VIN " + request.params.vin
             console.log(message)
             try {
                 errCode = error.status
@@ -127,7 +127,7 @@ Parse.Cloud.define("getRecallMastersResult", function(request, response) {
 
 
 Parse.Cloud.define("updateRecallEntry", function(request, response) {
-    var updateRecallEntry = function(entry, recallObject, isEntryExisting) {
+    var doUpdate = function(entry, recallObject, isEntryExisting) {
         entry.set("nhtsaID", recallObject["nhtsa_id"])
         entry.set("oemID", recallObject["oem_id"])
         entry.set("type", recallObject["type"])
@@ -146,31 +146,31 @@ Parse.Cloud.define("updateRecallEntry", function(request, response) {
         entry.set("laborMax", recallObject["labor_max"])
         entry.set("laborDifficulty", recallObject["labor_difficulty"])
         entry.set("reimbursement", recallObject["reimbursement"])
+        entry.set("forRecallMasters", recallObject["recallMastersPointer"])
 
-        entry.save(null, {
-            success: function() {
-                if (isEntryExisting) {
-                    response.success("Recall entry with NHTSA #" + recallObject["nhtsa_id"] + " is updated")
-                }
-                else {
-                    response.success("Recall entry with NHTSA #" + recallObject["nhtsa_id"] + " is added")
-                }
-
-            },
-            error: function(error) {
-                message = "Recall entry with NHTSA #" + recallObject["nhtsa_id"] + " cannot be saved"
-                // console.log(message)
-                // response.error(Parse.Error.OTHER_CAUSE, message)
-                response.error(message)
+        entry.save().then(function() {
+            if (isEntryExisting) {
+                response.success("recall record with NHTSA #" + recallObject["nhtsa_id"] + " is updated")
             }
+            else {
+                response.success("recall record with NHTSA #" + recallObject["nhtsa_id"] + " is added")
+            }
+        }, function(error) {
+            message = "recall record with NHTSA #" + recallObject["nhtsa_id"] + " cannot be saved"
+            // console.log(message)
+            // response.error(Parse.Error.OTHER_CAUSE, message)
+            response.error(message)
         })
     }
 
     var recallObject = request.params
     var isEntryExisting = undefined
+    var entry = undefined
+
+    var pointerToRecallMasters = recallObject["recallMastersPointer"]
 
     var query = new Parse.Query("RecallEntry")
-    query.equalTo("nhtsaID", recallObject["nhtsa_id"])
+    query.equalTo("forRecallMasters", pointerToRecallMasters)
 
     query.first({
         success: function(result) {
@@ -187,7 +187,7 @@ Parse.Cloud.define("updateRecallEntry", function(request, response) {
                 entry = newEntry
             }
 
-            updateRecallEntry(entry, recallObject, isEntryExisting)
+            doUpdate(entry, recallObject, isEntryExisting)
         },
         error: function(error) {
             console.log(error)
@@ -209,8 +209,8 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
         //
         //     for (var i = 0; i < recallMastersObject["recalls"].length; i++) {
         //         var currObject = recallMastersObject["recalls"][i]
-        //         // update the recall entry when adding a new recall record to the array
-        //         // assign the pointer to updated recall entry to recall list
+        //         // update the recall record when adding a new recall record to the array
+        //         // assign the pointer to updated recall record to recall list
         //         recalls.push(currObject["nhtsa_id"])
         //
         //         Parse.Cloud.run("updateRecallEntry", currObject)
@@ -221,7 +221,8 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
         entry.set("make", recallMastersObject["make"])
         entry.set("modelName", recallMastersObject["model_name"])
         entry.set("modelYear", recallMastersObject["model_year"])
-        entry.set("recalls", recallMastersObject["recalls"])
+        entry.set("recallsTemp", recallMastersObject["recalls"])
+        entry.set("recalls", []) // empty array
 
         // find car object by id
         query = new Parse.Query("Car")
@@ -237,15 +238,15 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
             }
         }).then(function() {
             // all attrs are set - save the object
-            entry.save().then(function() {
-                if (isEntryExisting) {
-                    response.success("Recall Master's result for VIN" + recallMastersObject["vin"] + " is updated")
-                }
-                else {
-                    response.success("Recall Master's result for VIN" + recallMastersObject["vin"] + " is added")
-                }
-            })
-        // error handling
+            return entry.save()
+
+        }).then(function() {
+            if (isEntryExisting) {
+                response.success("Recall Master's result for VIN " + recallMastersObject["vin"] + " is updated")
+            }
+            else {
+                response.success("Recall Master's result for VIN " + recallMastersObject["vin"] + " is added")
+            }
         }).then(function() {}, function(error) {
             message = "query on Car object failed"
             console.error(message)
@@ -255,6 +256,7 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
 
     var recallMastersObject = request.params
     var isEntryExisting = undefined
+    var entry = undefined
 
     var pointerToCar = {
         "__type": "Pointer",
@@ -294,9 +296,9 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
 Parse.Cloud.define("recallMastersWrapper", function(request, response) {
     Parse.Cloud.run("getRecallMastersResult", request.params, {
         success: function(result) {
-            data = result.data
-            data["car"] = request.params.car
-            Parse.Cloud.run("updateRecallMastersResult", data, {
+            var input = result.data
+            input["car"] = request.params.car
+            Parse.Cloud.run("updateRecallMastersResult", input, {
                 success: function(result) {
                     response.success(result)
                 },
@@ -309,6 +311,62 @@ Parse.Cloud.define("recallMastersWrapper", function(request, response) {
         error: function(error) {
             response.error(error)
         }
+    })
+})
+
+
+Parse.Cloud.afterSave("RecallMasters", function(request) {
+    var recallMastersObject = request.object
+    var objectId = recallMastersObject.id
+
+    var pointerToRecallMasters = {
+        "__type": "Pointer",
+        "className": "RecallMasters",
+        "objectId": objectId
+    }
+
+    var rawRecalls = recallMastersObject.get("recallsTemp")
+
+    if (!recallMastersObject.existed()) {
+        // first time creating the object - create recall entries
+
+        for (var i = 0; i < rawRecalls.length; i++) {
+            var params = rawRecalls[i]
+            // adding the pointer to params
+            params["recallMastersPointer"] = pointerToRecallMasters
+
+            // no error handlings at this time - messages are printed by child function
+            Parse.Cloud.run("updateRecallEntry", params)
+        }
+        // TODO: temp data is no cleaned - need to set up a trigger to do that
+        // after making sure all entries are added into RecallEntry
+    }
+})
+
+
+Parse.Cloud.beforeSave("RecallEntry", function(request, response) {
+    console.log("Hello, World!")
+    response.success()
+})
+
+
+Parse.Cloud.afterSave("RecallEntry", function(request) {
+    // saves pointer to the recall record back to RecallMaster (the parent class)
+
+    var pointerToRecallEntry = {
+        "__type": "Pointer",
+        "className": "RecallMasters",
+        "objectId": request.object.id
+    }
+
+    request.object.get("forRecallMasters").fetch().then(function(RecallMastersObject) {
+        // pushes pointer to the entry into the array of pointers
+        RecallMastersObject.set("recall", RecallMastersObject["recall"].push(pointerToRecallEntry))
+        return RecallMastersObject.save()
+    // error handling
+    }).then(function() {}, function(error) {
+        console.error("cannot add recall record pointer to RecallMasters")
+        console.error(error)
     })
 })
 
