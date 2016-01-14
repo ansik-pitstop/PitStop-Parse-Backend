@@ -221,7 +221,7 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
         entry.set("make", recallMastersObject["make"])
         entry.set("modelName", recallMastersObject["model_name"])
         entry.set("modelYear", recallMastersObject["model_year"])
-        entry.set("recallsTemp", recallMastersObject["recalls"])
+        entry.set("rawRecalls", recallMastersObject["recalls"])
         entry.set("recalls", []) // empty array
 
         // find car object by id
@@ -325,7 +325,7 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
         "objectId": objectId
     }
 
-    var rawRecalls = recallMastersObject.get("recallsTemp")
+    var rawRecalls = recallMastersObject.get("rawRecalls")
 
     if (!recallMastersObject.existed()) {
         // first time creating the object - create recall entries
