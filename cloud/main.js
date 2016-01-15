@@ -87,8 +87,8 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
 Parse.Cloud.beforeSave("Car", function(request, response){
    // check recalls before save
     var car = request.object;
-
-    var historyQuery = new Parse.Query("ServiceHistory");
+    
+/*    var historyQuery = new Parse.Query("ServiceHistory");
     historyQuery.equalTo("serviceId", 124);
     historyQuery.equalTo("carId", car.id);
     historyQuery.find({
@@ -120,7 +120,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
             response.error("error with service history - car not saved");
         }
     });
-
+*/
     // was in afterSave for car - think this should be done in beforeSave - Jiawei
 
     // puttig this part of code after checking isNew() to ensure it runs once only
@@ -149,8 +149,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
             }
         });
     }
-
-
+    response.success()
 
 });
 
@@ -166,13 +165,7 @@ Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
     // var serviceHistory = [];
 
-    var createdAt = request.object.get("createdAt");
-    var updatedAt = request.object.get("updatedAt");
-    var objectExisted = (createdAt.getTime() != updatedAt.getTime());
-
-    var isExisted = (request.object.existed() || objectExisted)
-
-    if (!isExisted) {
+    if (!car.existed()) {
         Parse.Cloud.run("recallMastersWrapper", {
             "vin": car.get("VIN"),
             // passing in the id string, not pointer to car object
