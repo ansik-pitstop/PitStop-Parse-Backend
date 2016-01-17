@@ -174,12 +174,82 @@ Parse.Cloud.afterSave("Car", function(request){
     var isExisted = (request.object.existed() || objectExisted)
 
     if (!isExisted) {
+        var pointerToCar = {
+            "__type": "Pointer",
+            "className": "Car",
+            "objectId": car.id
+        }
+
         Parse.Cloud.run("recallMastersWrapper", {
             "vin": car.get("VIN"),
-            // passing in the id string, not pointer to car object
-            "car": car.id
+            "car": pointerToCar
         })
     }
+
+    // business logic for updating state of RecallEntry objects in newRecalls, pendingRecalls and fixedRecalls
+    // --------------------------------
+
+    var newRecalls = carObject.get("newRecalls")
+    var pendingRecalls = carObject.get("pendingRecalls")
+    var fixedRecalls = carObject.get("recallsCompleted")
+
+    var promises  = []
+
+    // fetch RecallEntry objects in newRecalls and save the fetched objects in newRecalls
+    for (var i = 0; i < newRecalls.length; i++) {
+        promises.push(newRecalls[i].fetch())
+    }
+
+    Parse.Promise.when(promises).then(function() {
+        // NOTE: arguments is a hidden argument that contains all resolved value of promises
+
+        // reset newRecalls and promises
+        newRecalls = []
+        promises = []
+
+        for (var i = 0; i < arguments.length; i++) {
+            // update RecallEntry object with state "new"
+            var currRecallEntryObject = arguments[i]
+            currRecallEntryObject.set("state", "new")
+            currRecallEntryObject.save()
+        }
+    }
+
+    // similar to the procedure for newRecalls
+    for (var i = 0; i < pendingRecalls.length; i++) {
+        promises.push(pendingRecalls[i].fetch())
+    }
+    Parse.Promise.when(promises).then(function() {
+        pendingRecalls = []
+        promises = []
+        for (var i = 0; i < arguments.length; i++) {
+            var currRecallEntryObject = arguments[i]
+            currRecallEntryObject.set("state", "pending")
+            currRecallEntryObject.save()
+        }
+    }
+
+    // similar to the procedure for newRecalls
+    for (var i = 0; i < fixedRecalls.length; i++) {
+        promises.push(fixedRecalls[i].fetch())
+    }
+    Parse.Promise.when(promises).then(function() {
+        fixedRecalls = []
+        promises = []
+        for (var i = 0; i < arguments.length; i++) {
+            var currRecallEntryObject = arguments[i]
+            // state should be "doneByUser" since update is request by changes in Car object
+            currRecallEntryObject.set("state", "doneByUser")
+            currRecallEntryObject.save()
+        }
+    }
+
+    // --------------------------------
+    // Business logic for RecallEntry object dates ends
+
+
+
+
 
   // *** Edmunds is no longer used ***
 
