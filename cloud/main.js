@@ -133,6 +133,8 @@ Parse.Cloud.beforeSave("Car", function(request, response){
 
     if (request.object.isNew()) {
         car.set("newRecalls", [])
+        car.set("pendingRecalls", [])
+        car.set("recallsCompleted", [])
 
         var query = new Parse.Query("Service");
         query.equalTo("priority", 4);
@@ -184,6 +186,12 @@ Parse.Cloud.afterSave("Car", function(request){
     var objectExisted = (createdAt.getTime() != updatedAt.getTime());
 
     var isExisted = (request.object.existed() || objectExisted)
+
+    var dirtyKeys = car.dirtyKeys()
+
+    // NOTE: set it to false / undefined once dirtyKeys() returns the correct data
+    // right now dirtyKeys() always return an emptry array
+    var isRecallsModified = true
 
     if (!isExisted) {
 
@@ -260,8 +268,8 @@ Parse.Cloud.afterSave("Car", function(request){
 
         // --------------------------------
         // Business logic for RecallEntry object dates ends
-    }
 
+    }
   // *** Edmunds is no longer used ***
 
   //   if (!request.object.existed()){
