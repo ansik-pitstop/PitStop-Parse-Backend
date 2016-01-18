@@ -84,49 +84,56 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
 /*
  Car beforeSave: add recall information
 */
-
+//
 Parse.Cloud.beforeSave("Car", function(request, response){
    // check recalls before save
     var car = request.object;
 
-    var historyQuery = new Parse.Query("ServiceHistory");
-    historyQuery.equalTo("serviceId", 124);
-    historyQuery.equalTo("carId", car.id);
-    historyQuery.find({
-        success: function (services) {
-            //function to send services to app
+    // recalls from RemundsRecall is no longer displayed for user
 
-            var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
-
-            var recallQuery = new Parse.Query("EdmundsRecall");
-            recallQuery.notContainedIn("objectId", serviceIdStrings);
-            recallQuery.equalTo("make", car.get("make"));
-            recallQuery.equalTo("model", car.get("model"));
-            recallQuery.equalTo("year", car.get("year"));
-            recallQuery.find({
-                success: function (services) {
-                    var serviceIdStrings = services.map(function(s){return s.id;});
-                    car.set("pendingRecalls", serviceIdStrings)
-                    response.success();
-                },
-                error: function(error){
-                    response.success(); //call success anyway
-                }
-            });
-
-        },
-        error: function (error) {
-            console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
-            console.error("ERROR: ", error);
-            response.error("error with service history - car not saved");
-        }
-    });
+    // var historyQuery = new Parse.Query("ServiceHistory");
+    // historyQuery.equalTo("serviceId", 124);
+    // historyQuery.equalTo("carId", car.id);
+    // historyQuery.find({
+    //     success: function (services) {
+    //         //function to send services to app
+    //
+    //         var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
+    //
+    //         var recallQuery = new Parse.Query("EdmundsRecall");
+    //         recallQuery.notContainedIn("objectId", serviceIdStrings);
+    //         recallQuery.equalTo("make", car.get("make"));
+    //         recallQuery.equalTo("model", car.get("model"));
+    //         recallQuery.equalTo("year", car.get("year"));
+    //         recallQuery.find({
+    //             success: function (services) {
+    //                 var serviceIdStrings = services.map(function(s){return s.id;});
+    //                 car.set("pendingRecalls", serviceIdStrings)
+    //                 response.success();
+    //             },
+    //             error: function(error){
+    //
+    //                 // FIXME: THIS ONE CRASHES EVERYTHING!
+    //
+    //                 response.success(); //call success anyway
+    //             }
+    //         });
+    //
+    //     },
+    //     error: function (error) {
+    //         console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
+    //         console.error("ERROR: ", error);
+    //         response.error("error with service history - car not saved");
+    //     }
+    // });
 
     // was in afterSave for car - think this should be done in beforeSave - Jiawei
 
     // puttig this part of code after checking isNew() to ensure it runs once only
 
     if (request.object.isNew()) {
+        car.set("newRecalls", [])
+
         var query = new Parse.Query("Service");
         query.equalTo("priority", 4);
         query.find({
@@ -143,12 +150,17 @@ Parse.Cloud.beforeSave("Car", function(request, response){
                 }
                 car.set("serviceDue", true);
                 car.set("servicesDue", servicesDue);
+                response.success()
             },
             error: function (error) {
                 console.error("Could not find services with priority = ", 4);
                 console.error("ERROR: ", error);
+                response.error(error)
             }
         });
+    }
+    else {
+        response.success()
     }
 
 
@@ -174,82 +186,81 @@ Parse.Cloud.afterSave("Car", function(request){
     var isExisted = (request.object.existed() || objectExisted)
 
     if (!isExisted) {
-        var pointerToCar = {
-            "__type": "Pointer",
-            "className": "Car",
-            "objectId": car.id
-        }
 
         Parse.Cloud.run("recallMastersWrapper", {
             "vin": car.get("VIN"),
-            "car": pointerToCar
+            // sending the id of object, Parse doesn't allow passing pointer object as parameter
+            "car": car.id
         })
     }
 
-    // business logic for updating state of RecallEntry objects in newRecalls, pendingRecalls and fixedRecalls
-    // --------------------------------
+    else {
+        // business logic for updating state of RecallEntry objects in newRecalls, pendingRecalls and fixedRecalls
+        // --------------------------------
 
-    var newRecalls = carObject.get("newRecalls")
-    var pendingRecalls = carObject.get("pendingRecalls")
-    var fixedRecalls = carObject.get("recallsCompleted")
+        var newRecalls = car.get("newRecalls")
+        var pendingRecalls = car.get("pendingRecalls")
+        var fixedRecalls = car.get("recallsCompleted")
 
-    var promises  = []
-
-    // fetch RecallEntry objects in newRecalls and save the fetched objects in newRecalls
-    for (var i = 0; i < newRecalls.length; i++) {
-        promises.push(newRecalls[i].fetch())
-    }
-
-    Parse.Promise.when(promises).then(function() {
-        // NOTE: arguments is a hidden argument that contains all resolved value of promises
-
-        // reset newRecalls and promises
-        newRecalls = []
-        promises = []
-
-        for (var i = 0; i < arguments.length; i++) {
-            // update RecallEntry object with state "new"
-            var currRecallEntryObject = arguments[i]
-            currRecallEntryObject.set("state", "new")
-            currRecallEntryObject.save()
+        if (!newRecalls) {
+            // dealing with undefined value
+            newRecalls = []
         }
-    }
-
-    // similar to the procedure for newRecalls
-    for (var i = 0; i < pendingRecalls.length; i++) {
-        promises.push(pendingRecalls[i].fetch())
-    }
-    Parse.Promise.when(promises).then(function() {
-        pendingRecalls = []
-        promises = []
-        for (var i = 0; i < arguments.length; i++) {
-            var currRecallEntryObject = arguments[i]
-            currRecallEntryObject.set("state", "pending")
-            currRecallEntryObject.save()
+        if (!pendingRecalls) {
+            pendingRecalls = []
         }
-    }
-
-    // similar to the procedure for newRecalls
-    for (var i = 0; i < fixedRecalls.length; i++) {
-        promises.push(fixedRecalls[i].fetch())
-    }
-    Parse.Promise.when(promises).then(function() {
-        fixedRecalls = []
-        promises = []
-        for (var i = 0; i < arguments.length; i++) {
-            var currRecallEntryObject = arguments[i]
-            // state should be "doneByUser" since update is request by changes in Car object
-            currRecallEntryObject.set("state", "doneByUser")
-            currRecallEntryObject.save()
+        if (!fixedRecalls) {
+            fixedRecalls = []
         }
+
+        var newRecallsPromises = []
+        var pendingRecallsPromises = []
+        var fixedRecallsPromises = []
+
+        // fetch RecallEntry objects in newRecalls and save the fetched objects in newRecalls
+        for (var i = 0; i < newRecalls.length; i++) {
+            newRecallsPromises.push(newRecalls[i].fetch())
+        }
+
+        Parse.Promise.when(newRecallsPromises).then(function() {
+            // NOTE: arguments is a hidden argument that contains all resolved value of promises
+
+            for (var i = 0; i < arguments.length; i++) {
+                // update RecallEntry object with state "new"
+                var currRecallEntryObject = arguments[i]
+                currRecallEntryObject.set("state", "new")
+                currRecallEntryObject.save()
+            }
+        })
+
+        // similar to the procedure for newRecalls
+        for (var i = 0; i < pendingRecalls.length; i++) {
+            pendingRecallsPromises.push(pendingRecalls[i].fetch())
+        }
+        Parse.Promise.when(pendingRecallsPromises).then(function() {
+            for (var i = 0; i < arguments.length; i++) {
+                var currRecallEntryObject = arguments[i]
+                currRecallEntryObject.set("state", "pending")
+                currRecallEntryObject.save()
+            }
+        })
+
+        // similar to the procedure for newRecalls
+        for (var i = 0; i < fixedRecalls.length; i++) {
+            fixedRecallsPromises.push(fixedRecalls[i].fetch())
+        }
+        Parse.Promise.when(fixedRecallsPromises).then(function() {
+            for (var i = 0; i < arguments.length; i++) {
+                var currRecallEntryObject = arguments[i]
+                // state should be "doneByUser" since update is request by changes in Car object
+                currRecallEntryObject.set("state", "doneByUser")
+                currRecallEntryObject.save()
+            }
+        })
+
+        // --------------------------------
+        // Business logic for RecallEntry object dates ends
     }
-
-    // --------------------------------
-    // Business logic for RecallEntry object dates ends
-
-
-
-
 
   // *** Edmunds is no longer used ***
 
