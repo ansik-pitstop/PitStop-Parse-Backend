@@ -220,27 +220,9 @@ Parse.Cloud.define("updateRecallEntry", function(request, response) {
 
         doUpdate(entry, recallObject, isEntryExisting)
 
-    // }).then(function(recallEntryObject) {
-    //     var pointerToRecallEntry = {
-    //         "__type": "Pointer",
-    //         "className": "RecallEntry",
-    //         "objectId": recallEntryObject.id
-    //     }
-    //
-    //     if (isEntryExisting) {
-    //         message = "recall record with NHTSA #" + recallObject["nhtsa_id"] + " is updated"
-    //     }
-    //     else {
-    //         message = "recall record with NHTSA #" + recallObject["nhtsa_id"] + " is added"
-    //     }
-    //
-    //     response.success(pointerToRecallEntry)
-    // }, function(error) {
-    //     message = "recall record with NHTSA #" + recallObject["nhtsa_id"] + " cannot be saved"
-    //     console.error(message)
-    //     console.error(error)
-    //     // response.error(Parse.Error.OTHER_CAUSE, message)
-    //     response.error(message)
+    }, function(error) {
+        console.error(error)
+        response.error(error)
     })
 })
 
@@ -459,6 +441,10 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
 
     var message = undefined
 
+    console.log("aftersave of RecallMasters")
+    console.log("# of raw recalls: " + rawRecalls.length)
+    console.log("rawRecalls")
+
     if (rawRecalls) {
         // new recalls exists - add new recall entry
         var promises = []
@@ -468,6 +454,7 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
             params["recallMastersId"] = recallMastersObject.id
 
             // result of function being pushed is pointer to the saved entry
+            console.log("updating recall with NHTSA # " + rawRecalls[i]["nhtsa_id"])
             promises.push(Parse.Cloud.run("updateRecallEntry", params))
         }
 
@@ -495,17 +482,8 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
                 console.error(message)
                 console.error(error)
             })
-
-        }).then(function() {}, function(error) {
-            console.error("failed to push recalls to Car Object for VIN " + recallMastersObject.get("vin"))
-            console.error(error)
         })
     }
-})
-
-
-Parse.Cloud.beforeSave("RecallEntry", function(request, response) {
-    response.success()
 })
 
 
