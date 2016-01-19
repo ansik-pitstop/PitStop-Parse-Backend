@@ -55,6 +55,11 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
  Car beforeSave: add recall information
 */
 Parse.Cloud.beforeSave("Car", function(request, response){
+    var car = request.object;
+
+    // always save the VIN as in uppercase
+    car.set("VIN", car.get("VIN").toUpperCase());
+
     // check vin is unique
     if (!request.object.get("VIN")) {
       response.error('vin must exist');
@@ -74,7 +79,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
     }
 
     // check recalls before save
-    var car = request.object;
+
     var historyQuery = new Parse.Query("ServiceHistory");
     historyQuery.equalTo("serviceId", 124);
     historyQuery.equalTo("carId", car.id);
