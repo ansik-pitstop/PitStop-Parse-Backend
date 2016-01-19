@@ -105,7 +105,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
         }
     });
 
-  
+
 
 });
 
@@ -138,17 +138,22 @@ Parse.Cloud.afterSave("ServiceHistory", function(request){
 Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
 
-    if (!request.object.existed()) {
+    if (!car.existed()) {
       // do recall stuff
       Parse.Cloud.run("recallMastersWrapper", {
         "vin": car.get("VIN"),
         "car": car.id
       });
 
+      var mileage = car.get("totalMileage");
+      if (mileage === undefined || mileage === 0) {
+        mileage = car.get("baseMileage");
+      }
+
       // do service stuff
       Parse.Cloud.run("carServicesUpdate", {
         carVin: car.get("VIN"),
-        mileage: car.get("baseMileage")
+        mileage: mileage
       }, {
         success: function(result){
           console.log("success: ");
@@ -547,6 +552,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       }
     }
 
+    var dealerServices = false;
+
     // DEALER FIXED SERVICES
     var fixed = new Parse.Query("ServiceFixed");
     // filter for same dealership and mileage less than current total
@@ -559,6 +566,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       historyList.push([history.get("serviceObjectId"), history.get("mileage")]);
     }).then(function() {
       fixed.each(function (service) {
+        dealerServices = true;
         // get the history for this particular service
         var history = false;
         for (var z = 0; z < historyList.length; z++) {
@@ -596,6 +604,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       historyList.push([history.get("serviceObjectId"), history.get("mileage")]);
     }).then(function() {
       intervals.each(function (service) {
+        dealerServices = true;
         var intMileage = service.get("mileage");
         // get the history for this particular service
         // find the mileage of the last time it was done
@@ -615,7 +624,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
           if(carMileage > intMileage - 500) {
             pendingInterval.push(service.id);
           }
-        // if history, check interval(minus 500) based on the last time it was done, 
+        // if history, check interval(minus 500) based on the last time it was done,
         } else {
           console.log(historyMileage + "HISTORY MILEAGE");
           var currentIntervalMileage = carMileage - historyMileage;
@@ -625,29 +634,27 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
       }).then(function() {
         car.set("pendingIntervalServices", pendingInterval);
+        //save car
+        console.log("car saved" + dealerServices);
+        car.save(); // XXX should this be here?
+        // if no dealership, show edmunds services
+        if ((pendingInterval === [] || pendingFixed === []) &&
+            (!car.get("dealership") || !dealerServices)){ // has no dealer or no dealershsips
+          console.log("no dealership or no dealer services");
+          readEdmundsServices();
+        } else {
+          console.log("no services due, car saved");
+          carSave(false);
+        }
       }, function(error) {
         alert("Error: " + error.code + " " + error.message);
       });
     }, function(error) {
       alert("Error: " + error.code + " " + error.message);
     });
-
-    //save car
-    console.log("car saved");
-    car.save(); // XXX should this be here?
-    // if no dealership, show edmunds services
-    if (!car.get("dealership")){ // has no dealer
-      console.log("no dealership");
-      readEdmundsServices();
-    } else if (pendingInterval !== [] || pendingFixed !== []) {
-      carSave(false); // service stack is currently []
-    } else {
-      console.log("no services due, car saved");
-      carSave(false);
-    }
 };
 
-  var readEdmundsServices = function () {
+   var readEdmundsServices = function () {
     // query for the Edmunds Services associated with this Car
     var edmundsQuery = new Parse.Query("EdmundsService");
     edmundsQuery.equalTo("make", car.get("make"));
@@ -698,7 +705,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                     success: function(result){
                       // if it works we call this same function recursively, as now length of history will be > 0, and we want to query them
                       // properly, as right now edmundsServices is a json object instead of a query
-                      readEdmundsServices();  
+                      readEdmundsServices();
                     },
                     error: function(error){
                       console.error(error);
@@ -854,8 +861,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     var highestMileage = 0;
     if (edmunds) { // true = edmunds is used, false = dealer services.
 
-      /* get rid of duplicate services with same mileage 
-         EX: we might have 3 oil changes in serviceStack right now, 10k, 20k, 30k. 
+      /* get rid of duplicate services with same mileage
+         EX: we might have 3 oil changes in serviceStack right now, 10k, 20k, 30k.
          only keep the one at 30k
          therefore: loop through all services and compare them */
       for(var i = 0; i < serviceStack.length; i++){
@@ -888,7 +895,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       });
       serviceStack = serviceStack.slice(0,5);
 
-      // add new services to the servicesDue array, even above the limit of 5... 
+      // add new services to the servicesDue array, even above the limit of 5...
       var servicesDue = car.get("pendingEdmundServices");
       if (servicesDue === undefined) servicesDue = [];
       var prioritySum = 0;
@@ -956,7 +963,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
 
     }*/
-    
+
     notificationToSave.set("content", notificationContent);
     notificationToSave.set("scanId", scan.id);
     notificationToSave.set("title", notificationTitle);
@@ -1081,7 +1088,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
 
       console.log("sendEmail html");
       console.log(emailHtml);
-      
+
       sendgrid.sendEmail({
         to: "thebe@ansik.ca",
         from: user.get("email"),
@@ -1113,7 +1120,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
             success: function (shops) {
                shop = shops[0];
                console.log("Shop "); console.log(shop);
-               
+
                var carQuery = new Parse.Query("Car");
                carQuery.equalTo("VIN", carVin);
                carQuery.find({
