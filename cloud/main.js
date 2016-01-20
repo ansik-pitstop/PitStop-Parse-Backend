@@ -56,62 +56,54 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
 */
 Parse.Cloud.beforeSave("Car", function(request, response){
     var car = request.object;
+    if (car.isNew()) { // car doesnt exist yet
+      car.set("pendingIntervalServices", []);
+      car.set("pendingEdmundServices", []);
+      car.set("pendingFixedServices", []);
+      car.set("storedDTCs", []);
 
-    // always save the VIN as in uppercase
-    car.set("VIN", car.get("VIN").toUpperCase());
+      if (!car.get("baseMileage")) {
+        car.set("baseMileage", 0);
+      }
 
-    // check vin is unique
-    if (!request.object.get("VIN")) {
-      response.error('vin must exist');
-    } else {
-      var query = new Parse.Query("Car");
-      query.equalTo("VIN", request.object.get("VIN"));
-      query.first({
-        success: function(object) {
-          if (object && object.id !== request.object.id) {
-            response.error("VIN already exists");
+      car.set("totalMileage", car.get("baseMileage"));
+
+      // always save the VIN as in uppercase
+      // changes oh to 0, i to 1
+      car.set("VIN", car.get("VIN").toUpperCase().replace("I", "1").replace("O", "0").replace("Q", "0"));
+    
+      // check vin is unique
+      if (!car.get("VIN")) {
+        response.error('vin must exist');
+      } else if (car.get("VIN").length !== 17) {
+        response.error('vin must be 17 chars');
+      } else {
+        var query = new Parse.Query("Car");
+        query.equalTo("VIN", request.object.get("VIN"));
+        query.first({
+          success: function(object) {
+            if (object && object.id !== request.object.id) {
+              response.error("VIN already exists");
+            } else {
+              response.success();
+            }
+          },
+          error: function(error) {
+            response.error("Could not validate uniqueness for this Car object.");
           }
-        },
-        error: function(error) {
-          response.error("Could not validate uniqueness for this Car object.");
-        }
-      });
+        });
+      }
+    } else { // car already existed
+      // this should include recalls too, but not by querying the recall table...
+      // XXX: add number of recalls to car table
+      var numberServices = 0;
+      numberServices += car.get("pendingIntervalServices").length +
+        car.get("pendingEdmundServices").length +
+        car.get("pendingFixedServices").length +
+        car.get("storedDTCs").length;
+      car.set("numberOfServices", numberServices);
+      response.success();
     }
-
-    // check recalls before save
-
-    var historyQuery = new Parse.Query("ServiceHistory");
-    historyQuery.equalTo("serviceId", 124);
-    historyQuery.equalTo("carId", car.id);
-    historyQuery.find({
-        success: function (services) {
-            //function to send services to app
-            var serviceIdStrings = services.map(function(s){return s.get("serviceObjectId");});
-            var recallQuery = new Parse.Query("EdmundsRecall");
-            recallQuery.notContainedIn("objectId", serviceIdStrings);
-            recallQuery.equalTo("make", car.get("make"));
-            recallQuery.equalTo("model", car.get("model"));
-            recallQuery.equalTo("year", car.get("year"));
-            recallQuery.find({
-                success: function (services) {
-                    var serviceIdStrings = services.map(function(s){return s.id;});
-                    car.set("pendingRecalls", serviceIdStrings);
-                    response.success();
-                },
-                error: function(error){
-                    response.success(); //call success anyway
-                }
-            });
-        },
-        error: function (error) {
-            console.error("Could not find serviceHistory for car ", car.get("make")+" "+car.get("model"));
-            console.error("ERROR10: ", error);
-            response.error("error with service history - car not saved");
-        }
-    });
-
-
-
 });
 
 /*
