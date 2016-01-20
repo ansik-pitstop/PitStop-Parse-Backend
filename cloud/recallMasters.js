@@ -428,6 +428,50 @@ Parse.Cloud.define("recallMastersWrapper", function(request, response) {
 })
 
 
+var updateActiveRecallCountInCar = function(recallMastersObject) {
+    var pointerToRecallMasters = {
+        "__type": "Pointer",
+        "className": "RecallMasters",
+        "objectId": recallMastersObject.id
+    }
+
+    console.log("updating # of active recalls into Car object")
+
+    query = new Parse.Query("RecallEntry")
+    query.equalTo("forRecallMasters", pointerToRecallMasters)
+    query.find().then(function(result) {
+        var numberOfRecalls = 0
+
+        for (var i = 0; i < result.length; i++) {
+            var currState = result[i].get("state")
+            if (currState === "new" || currState === "pending") {
+                numberOfRecalls += 1
+            }
+        }
+
+        recallMastersObject.get("forCar").fetch().then(function (carObject) {
+            console.log("active recalls: " + numberOfRecalls)
+            carObject.set("numberOfRecalls", numberOfRecalls)
+            carObject.save()
+
+        }, function(error) {
+            console.error("failed to save car when updating # of active recalls")
+            return error
+        })
+
+    }, function(error) {
+        // retry if after 5 second if recieved error code 124: request timed out
+        if (error.status === 124) {
+            // recusrive call after 5 second
+            console.error("failed to update # of active recalls, retry after 5 seconds")
+            setTimeout(updateActiveRecallCountInCar(recallMastersObject), 5000)
+        }
+    }
+
+)
+}
+
+
 Parse.Cloud.afterSave("RecallMasters", function(request) {
     var recallMastersObject = request.object
 
@@ -443,9 +487,8 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
 
     console.log("aftersave of RecallMasters")
     console.log("# of raw recalls: " + rawRecalls.length)
-    console.log("rawRecalls")
 
-    if (rawRecalls) {
+    if (rawRecalls && rawRecalls.length !== 0) {
         // new recalls exists - add new recall entry
         var promises = []
 
@@ -477,11 +520,25 @@ Parse.Cloud.afterSave("RecallMasters", function(request) {
             recallMastersObject.save().then(function() {
                 console.log("pointers to new RecallEntry objects are added")
 
+                updateActiveRecallCountInCar(recallMastersObject)
+
             }, function(error) {
                 message = "failed to add pointers to new RecallEntry objects"
                 console.error(message)
                 console.error(error)
             })
+        })
+    }
+})
+
+Parse.Cloud.afterSave("RecallEntry", function(request, response) {
+    var recallEntryObject = request.object
+
+    if (recallEntryObject.existed()) {
+        // update # of active recalls only after the first time of creation
+
+        recallEntryObject.get("forRecallMasters").fetch().then(function(recallMastersObject) {
+            updateActiveRecallCountInCar(recallMastersObject)
         })
     }
 })
