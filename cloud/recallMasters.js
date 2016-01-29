@@ -543,5 +543,32 @@ Parse.Cloud.afterSave("RecallEntry", function(request, response) {
     }
 })
 
+Parse.Cloud.job("updateRecallMastersManually", function(request, response) {
+    var vin = request.params.vin
+    var message = ""
+
+    var query = new Parse.Query("Car")
+    query.equalTo("VIN", vin)
+    query.find().then(function (result) {
+        if (result.length !== 1) {
+            if (result.length == 0) {
+                message = "no car found with VIN " + vin
+            }
+            else {
+                message = "multiple cars with VIN " + vin + " found"
+            }
+            response.error(message)
+        }
+        else {
+            return result[0]
+        }
+    }).then(function (carObject) {
+
+        Parse.Cloud.run("recallMastersWrapper", {
+          "vin": vin,
+          "car": carObject.id
+        })
+    })
+})
 
 // TODO: need after_delete method for RecallMasters and RecallEntry to ensure there is no dangling pointers in Car or RecallMasters
