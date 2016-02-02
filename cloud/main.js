@@ -337,7 +337,6 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
     });
   };
 
-  // XXX update notification logic
   var notify = function(data, car) {
     var description = data.get("description");
     var dtc = data.get("dtcCode");
@@ -895,6 +894,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     console.log(serviceStack);
     var seen = [];
     var highestMileage = 0;
+    var servicesDue = [];
+    var prioritySum = 0;
     if (edmunds) { // true = edmunds is used, false = dealer services.
 
       /* get rid of duplicate services with same mileage
@@ -932,7 +933,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       serviceStack = serviceStack.slice(0,5);
 
       // get rid of any old services
-      var servicesDue = car.get("pendingEdmundServices");
+      servicesDue = car.get("pendingEdmundServices");
       if (servicesDue === undefined) servicesDue = [];
       for  (i = 0; i < servicesDue.length; i++) {
         for (var z = 0; z < edmundsHistory.length; z++) {
@@ -945,7 +946,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       // XXX: what if a new service is added to the edmunds service table?
       // right now we only pull that data once per car so it doesnt matter
       // add new services to the servicesDue array
-      var prioritySum = 0;
       for (i = 0; i < serviceStack.length; i++) {
         var service = serviceStack[i];
         prioritySum += service.get("priority");
@@ -954,20 +954,20 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
           servicesDue.push(service.id);
         }
       }
-
-      // if the sum of priorities is above 5 send them a notification
-      if (prioritySum > 5) {
-        // saveNotification(serviceStack); XXX:notifications need reworked
-        car.set("serviceDue", true);
-      }
       car.set("pendingEdmundServices", servicesDue);
+      car.set("pendingIntervalServices", []);
+      car.set("pendingFixedServices", []);
     } else { // edmunds isnt used
-      if (pendingFixed.length + pendingInterval.length > 0) {
-        car.set("serviceDue", true);
-      } else {
-        car.set("serviceDue", false);
-      }
       car.set("pendingEdmundServices", []);
+    }
+
+    if (pendingFixed.length + pendingInterval.length + servicesDue.length > 0) {
+      if(servicesDue.length === 0 || prioritySum > 5) {
+        saveNotification(servicesDue);
+      }
+      car.set("serviceDue", true);
+    } else {
+      car.set("serviceDue", false);
     }
 
     car.save(null, {
@@ -1047,7 +1047,6 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
               var car = cars[i];
               status.message(car.toString());
               var mileage = car.get("baseMileage") + mileageAddition; // add baseMileage
-              car.set("baseMileage", mileage);
               car.set("totalMileage", mileage);
           }
           Parse.Object.saveAll(cars, {
