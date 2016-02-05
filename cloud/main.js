@@ -141,13 +141,37 @@ Parse.Cloud.afterSave("ServiceHistory", function(request){
   }
 });
 
+
 /*
  Car aftersave: load calibration services
  */
 Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
 
-    if (!car.existed()) {
+    if (!car.existed()) {    
+      // notification
+      if(!Parse.User.current().get("firstCar")){
+        var Notification = Parse.Object.extend("Notification");
+        var notificationToSave = new Notification();
+        var notificationContent = "Welcome to Pitstop!";
+        var notificationTitle = "Welcome!";
+
+        notificationToSave.set("content", notificationContent);
+        notificationToSave.set("title", notificationTitle);
+        notificationToSave.set("toId", Parse.User.current().id);
+        notificationToSave.save(null, {
+          success: function(notificationToSave){
+            //saved
+          },
+          error: function(notificationToSave, error){
+            console.error("Error: " + error.code + " " + error.message);
+          }
+        });
+        Parse.User.current().set("firstCar", true)
+        Parse.User.current().save()
+      }
+      
+
       // do recall stuff
       Parse.Cloud.run("recallMastersWrapper", {
         "vin": car.get("VIN"),
@@ -367,7 +391,6 @@ Parse.Cloud.afterSave("Notification", function(request) {
 
   var pushQuery = new Parse.Query(Parse.Installation);
 
-  pushQuery.equalTo('deviceType', 'ios');//ios
   pushQuery.equalTo('userId', notification.get("toId"));
 
   Parse.Push.send({
@@ -1136,7 +1159,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       console.log(emailHtml);
 
       sendgrid.sendEmail({
-        to: "thebe@ansik.ca",
+        to: shop.get("email"),
         from: user.get("email"),
         subject: "Service Request from " + user.get("name"),
         html: emailHtml
@@ -1154,25 +1177,26 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       });
    }
 
-   userQuery = new Parse.Query(Parse.User);
-   userQuery.equalTo("objectId", userObjectId);
-   userQuery.find({
-      success: function (users) {
-         user = users[0];
+   
+   var carQuery = new Parse.Query("Car");
+   carQuery.equalTo("VIN", carVin);
+   carQuery.find({
+      success: function (cars) {
+         car = cars[0];
 
          shopQuery = new Parse.Query("Shop");
-         shopQuery.equalTo("objectId", user.get("subscribedShop"));
+         shopQuery.equalTo("objectId", car.get("dealership"));
          shopQuery.find({
             success: function (shops) {
                shop = shops[0];
                console.log("Shop "); console.log(shop);
 
-               var carQuery = new Parse.Query("Car");
-               carQuery.equalTo("VIN", carVin);
-               carQuery.find({
-                  success: function (cars) {
-                     car = cars[0];
-                     console.log("Car "); console.log(car);
+               userQuery = new Parse.Query(Parse.User);
+               userQuery.equalTo("objectId", userObjectId);
+               userQuery.find({
+                  success: function (users) {
+                     user = users[0];
+                     
                      sendEmail (user, car, shop);
                   },
                   error: function (error) {
