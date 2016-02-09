@@ -324,6 +324,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
     var dtcData = scan["DTCs"];
     console.log("dtcs");
     var dtcs = dtcData.split(",");
+    var dtclst = [];
     for (var i = 0; i < dtcs.length; i++){
       //check for DTCs
       if (dtcs[i] !== ""){
@@ -336,6 +337,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
           query.find({
             success: function (data) {
               if (data.length > 0) {
+                dtclst.push(data[0]);
                 notify(data[0], car);
               }
             },
@@ -350,16 +352,96 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
 
     car.save(null, {
       success: function (savedCar) {
-        console.log("car saved");
-        response.success("car saved"); // success for cloud function
+        console.log("car saved"); // success for cloud function
       },
       error: function (saveError) {
         console.log("car not saved");
         console.error(saveError);
         response.error("car not saved"); //failure for cloud function
       }
+    }).then(function() {
+      if(dtclst.length > 0){
+        shopQuery = new Parse.Query("Shop");
+        shopQuery.equalTo("objectId", car.get("dealership"));
+        shopQuery.first({
+          success: function(shop){
+              userQuery = new Parse.Query(Parse.User);
+              userQuery.equalTo("objectId", car.get("owner"));
+              userQuery.first({
+                success: function(user){
+                   sendEmail (user, car, shop, dtclst);
+                },
+                error: function (error) {
+                  console.error(error);
+                  response.error();
+                }
+              });
+           },
+           error: function (error) {
+             console.log("Error " + error);
+             response.error();
+           }
+        });
+      } else {
+        response.success();
+      }
+    }, function(error) {
+      response.error("Error: " + error.code + " " + error.message);
     });
   };
+
+  function sendEmail (user, car, shop, dtclst ) {
+      var emailHtml = "<h2>Notification sent to customer</h2>";
+      emailHtml += "<strong>DTC alert for:</strong> " + user.get("name");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Customer's Phone Number:</strong> " + user.get("phoneNumber");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Vehicle:</strong> " + car.get("make") + " " + car.get("model");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Vehicle Year:</strong> " + car.get("year");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Vehicle VIN:</strong> " + car.get("VIN");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Vehicle Engine:</strong> " + car.get("engine");
+      emailHtml += "<br>";
+      emailHtml += "<strong>Vehicle Mileage:</strong> " + car.get("totalMileage");
+      emailHtml += "<br>";
+
+      emailHtml += "<h2>Alerts</h2>";
+      emailHtml += "<ul>";
+
+      for (i=0; i < dtclst.length; i++) {
+        var description = dtclst[i].get("description");
+        var dtc = dtclst[i].get("dtcCode");
+        emailHtml += "<li>";
+        emailHtml += dtc;
+        emailHtml += "<br>" + description;
+        emailHtml += "</li>";
+      }
+      emailHtml += "</ul>";
+
+      console.log("sendEmail html");
+      console.log(emailHtml);
+
+      sendgrid.sendEmail({
+        to: shop.get("email"),
+        from: user.get("email"),
+        subject: "Notification sent to " + user.get("name"),
+        html: emailHtml
+      }, {
+         success: function(httpResponse) {
+            console.log(httpResponse);
+            console.log("Email sent!");
+            response.success("Email sent!");
+         },
+         error: function(httpResponse) {
+            console.error(httpResponse);
+            console.log("Error sending email");
+            response.error("Error sending email");
+         }
+      });
+   }
+
 
   var notify = function(data, car) {
     var description = data.get("description");
@@ -562,7 +644,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   var serviceStack = [];
   var newServices = false;
   var pendingFixed = [];
+  var fixedDesc = [];
   var pendingInterval = [];
+  var intervalDesc = [];
   var scannerId = scan["scannerId"];
   var carVin = scan["carVin"];
   var edmundsHistory = [];
@@ -662,6 +746,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
           if (!history){
             if(carMileage > service.get("mileage") - 500) {
               pendingFixed.push(service.id);
+              fixedDesc.push(service.get("itemDescription"));
             }
           }
         }).then(function() {
@@ -694,6 +779,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
           if (!history){
             if(carMileage > intMileage - 500) {
               pendingInterval.push(service.id);
+              intervalDesc.push(service.get("itemDescription"));
             }
           // if history, check interval(minus 500) based on the last time it was done,
           } else {
@@ -701,6 +787,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             var currentIntervalMileage = carMileage - historyMileage;
             if (currentIntervalMileage - intMileage > -500) {
               pendingInterval.push(service.id);
+              intervalDesc.push(service.get("itemDescription"));
             }
           }
         }).then(function() {
@@ -985,6 +1072,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     }
 
     if (pendingFixed.length + pendingInterval.length + servicesDue.length > 0) {
+      // if services due == 0, then there is a pending fixed or interval
+      // thus when checking the priority sum, we know there are services due, so check priority > 5
       if(servicesDue.length === 0 || prioritySum > 5) {
         saveNotification(servicesDue);
       }
@@ -1047,6 +1136,79 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         console.error("Error: " + error.code + " " + error.message);
       }
     });
+
+    if(servicesDue.length === 0){
+      shopQuery = new Parse.Query("Shop");
+      shopQuery.equalTo("objectId", car.get("dealership"));
+      shopQuery.first({
+        success: function (shop) {
+          userQuery = new Parse.Query(Parse.User);
+          userQuery.equalTo("objectId", car.get("owner"));
+          userQuery.first({
+            success: function(user){
+              var emailHtml = "<h2>Notification sent to customer</h2>";
+              emailHtml += "<strong>Service alert for:</strong> " + user.get("name");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Customer's Phone Number:</strong> " + user.get("phoneNumber");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Vehicle:</strong> " + car.get("make") + " " + car.get("model");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Vehicle Year:</strong> " + car.get("year");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Vehicle VIN:</strong> " + car.get("VIN");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Vehicle Engine:</strong> " + car.get("engine");
+              emailHtml += "<br>";
+              emailHtml += "<strong>Vehicle Mileage:</strong> " + car.get("totalMileage");
+              emailHtml += "<br>";
+
+              emailHtml += "<h2>Alerts</h2>";
+              emailHtml += "<ul>";
+
+              for (i=0; i < fixedDesc.length; i++) {
+                emailHtml += "<li>";
+                emailHtml += fixedDesc[i] + "<br>";
+                emailHtml += "</li>";
+              }
+              for (i=0; i < intervalDesc.length; i++) {
+                emailHtml += "<li>";
+                emailHtml += intervalDesc[i] + "<br>";
+                emailHtml += "</li>";
+              }
+              emailHtml += "</ul>";
+              emailHtml = emailHtml.replace("undefined", "~no description~")
+
+              console.log("sendEmail html");
+              console.log(emailHtml);
+
+              sendgrid.sendEmail({
+                to: shop.get("email"),
+                from: user.get("email"),
+                subject: "Notification sent to " + user.get("name"),
+                html: emailHtml
+              }, {
+                 success: function(httpResponse) {
+                    console.log(httpResponse);
+                    console.log("Email sent!");
+                 },
+                 error: function(httpResponse) {
+                    console.error(httpResponse);
+                    console.log("Error sending email");
+                 }
+              });
+            },
+            error: function (error) {
+              console.error(error);
+              response.error();
+            }
+          });
+        },
+        error: function (error) {
+          console.log("Error " + error);
+          response.error();
+        }
+      });
+    }
   };
 }); // END CAR SERVICES UPDATE
 
@@ -1099,7 +1261,6 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
 
    function sendEmail (user, car, shop) {
       var emailHtml = "<h2>Customer Information</h2>";
-      emailHtml += "<br>";
       emailHtml += "<strong>Service Request By:</strong> " + user.get("name");
       emailHtml += "<br>";
       emailHtml += "<strong>Customer's Phone Number:</strong> " + user.get("phoneNumber");
@@ -1116,7 +1277,6 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       emailHtml += "<br>";
 
       emailHtml += "<h2>Required Services</h2>";
-      emailHtml += "<br>";
       emailHtml += "<ul>";
 
       for (i=0; i < services.length; i++) {
