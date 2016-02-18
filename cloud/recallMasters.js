@@ -349,8 +349,6 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
             entry.set("recalls", []) // empty array
         } // else dont make changes
 
-        console.log("DEBUG: " + "saving recallMastersObject")
-
         entry.save().then(function() {
             var message = undefined
             if (isEntryExisting) {
@@ -365,7 +363,6 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
         }, function(error) {
             message = "failed to add Recall Master's result for VIN " + recallMastersObject["vin"]
             console.error(message)
-            console.error(error)
             response.error(error)
         })
     }
@@ -410,25 +407,26 @@ Parse.Cloud.define("updateRecallMastersResult", function(request, response) {
 
 
 Parse.Cloud.define("recallMastersWrapper", function(request, response) {
-  var input;
-  Parse.Cloud.run("getRecallMastersResult", request.params).then(function(result) {
-    input = result.data
-    input["car"] = request.params.car
-    console.log("DEBUG: " + "attempt 1 of updateRecallMastersResult()")
-    return Parse.Cloud.run("updateRecallMastersResult", input)
-  }).then(function(result) {
-    response.success(result)
-  }, function(error) {
-    console.error(error)
-    // run the function again - might be caused becauses of timeout issue
-    console.log("DEBUG: " + "attempt 2 of updateRecallMastersResult()")
-    return Parse.Cloud.run("updateRecallMastersResult", input)
-  }).then(function(result) {
-    response.success(result)
-  }, function(error) {
-    response.error(error)
-  })
+    Parse.Cloud.run("getRecallMastersResult", request.params, {
+        success: function(result) {
+            var input = result.data
+            input["car"] = request.params.car
+            Parse.Cloud.run("updateRecallMastersResult", input, {
+                success: function(result) {
+                    response.success(result)
+                },
+                error: function(error) {
+                    response.error(error)
+                }
+            })
+        },
+
+        error: function(error) {
+            response.error(error)
+        }
+    })
 })
+
 
 var updateActiveRecallCountInCar = function(recallMastersObject) {
     var pointerToRecallMasters = {
@@ -540,7 +538,7 @@ Parse.Cloud.afterSave("RecallEntry", function(request, response) {
         // update # of active recalls only after the first time of creation
 
         recallEntryObject.get("forRecallMasters").fetch().then(function(recallMastersObject) {
-            updateActiveRecallCountInCar(recallMastersObject)
+            // updateActiveRecallCountInCar(recallMastersObject)
         })
     }
 })
