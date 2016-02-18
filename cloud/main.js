@@ -55,67 +55,98 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
  Car beforeSave: add recall information
 */
 Parse.Cloud.beforeSave("Car", function(request, response){
-    var car = request.object;
-    if (car.isNew()) { // car doesnt exist yet
-      car.set("pendingIntervalServices", []);
-      car.set("pendingEdmundServices", []);
-      car.set("pendingFixedServices", []);
-      car.set("storedDTCs", []);
+  var getNumberOfRecalls = function(carObject) {
+    var query = new Parse.Query("RecallMasters");
+    query.equalTo("forCar", carObject);
+    query.find().then(function(recallMastersObject) {
+      queryNew = new Parse.Query("RecallEntry");
+      queryPending = new Parse.Query("RecallEntry");
+      queryNew.equalTo("state", "new");
+      queryPending.equalTo("state", "pending");
+      query = Parse.Query("RecallEntry");
+      query.or(queryNew, queryPending);
+      return query.count();
+    }
+    , function(error) {
+      console.error("error");
+      return error;
+    })
+  }
 
-      if (!car.get("baseMileage")) {
-        car.set("baseMileage", 0);
-      }
+  var car = request.object;
+  if (car.isNew()) { // car doesnt exist yet
+    car.set("pendingIntervalServices", []);
+    car.set("pendingEdmundServices", []);
+    car.set("pendingFixedServices", []);
+    car.set("storedDTCs", []);
 
-      car.set("totalMileage", car.get("baseMileage"));
+    if (!car.get("baseMileage")) {
+      car.set("baseMileage", 0);
+    }
 
-      // always save the VIN as in uppercase
-      // changes oh to 0, i to 1
-      car.set("VIN", car.get("VIN").toUpperCase().replace(/I/g, "1").replace(/O/g, "0").replace(/Q/g, "0"));
-    
-      // check vin is unique
-      if (!car.get("VIN")) {
-        response.error('vin must exist');
-      } else if (car.get("VIN").length !== 17) {
-        response.error('vin must be 17 chars');
-      } else {
-        var query = new Parse.Query("Car");
-        query.equalTo("VIN", request.object.get("VIN"));
-        query.first({
-          success: function(object) {
-            if (object && object.id !== request.object.id) {
-              response.error("VIN already exists");
-            } else {
-              response.success();
-            }
-          },
-          error: function(error) {
-            response.error("Could not validate uniqueness for this Car object.");
+    car.set("totalMileage", car.get("baseMileage"));
+
+    // always save the VIN as in uppercase
+    // changes oh to 0, i to 1
+    car.set("VIN", car.get("VIN").toUpperCase().replace(/I/g, "1").replace(/O/g, "0").replace(/Q/g, "0"));
+
+    // check vin is unique
+    if (!car.get("VIN")) {
+      response.error('vin must exist');
+    } else if (car.get("VIN").length !== 17) {
+      response.error('vin must be 17 chars');
+    } else {
+      var query = new Parse.Query("Car");
+      query.equalTo("VIN", request.object.get("VIN"));
+      query.first({
+        success: function(object) {
+          if (object && object.id !== request.object.id) {
+            response.error("VIN already exists");
+          } else {
+            response.success();
           }
-        });
-      }
-    } else { // car already existed
-      // temporary for main branch
-      if(!car.get("pendingIntervalServices")){
-        car.set("pendingIntervalServices", []);
-      }
-      if(!car.get("pendingEdmundServices")){
-        car.set("pendingEdmundServices", []);
-      }
-      if(!car.get("pendingFixedServices")){
-        car.set("pendingFixedServices", []);
-      }
-      if(!car.get("storedDTCs")){
-        car.set("storedDTCs", []);
-      }
+        },
+        error: function(error) {
+          response.error("Could not validate uniqueness for this Car object.");
+        }
+      });
+    }
+  } else { // car already existed
+    // temporary for main branch
+    if(!car.get("pendingIntervalServices")){
+      car.set("pendingIntervalServices", []);
+    }
+    if(!car.get("pendingEdmundServices")){
+      car.set("pendingEdmundServices", []);
+    }
+    if(!car.get("pendingFixedServices")){
+      car.set("pendingFixedServices", []);
+    }
+    if(!car.get("storedDTCs")){
+      car.set("storedDTCs", []);
+    }
 
+    getNumberOfRecalls().then(function(numberOfRecalls) {
+      car.set("numberOfRecalls", numberOfRecalls);
       var numberServices = 0;
       numberServices += car.get("pendingIntervalServices").length +
-        car.get("pendingEdmundServices").length +
-        car.get("pendingFixedServices").length +
-        car.get("storedDTCs").length;
-      car.set("numberOfServices", numberServices);
+                        car.get("pendingEdmundServices").length +
+                        car.get("pendingFixedServices").length +
+                        car.get("storedDTCs").length;
+                        car.set("numberOfServices", numberServices);
       response.success();
-    }
+    }, function(error) {
+      var numberOfRecalls = 0;
+      car.set("numberOfRecalls", numberOfRecalls);
+      var numberServices = 0;
+      numberServices += car.get("pendingIntervalServices").length +
+                        car.get("pendingEdmundServices").length +
+                        car.get("pendingFixedServices").length +
+                        car.get("storedDTCs").length;
+                        car.set("numberOfServices", numberServices);
+      response.success();
+    })
+  }
 });
 
 /*
@@ -148,9 +179,21 @@ Parse.Cloud.afterSave("ServiceHistory", function(request){
 Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
 
-    if (!car.existed()) {    
+    var next = function() {
+      var mileage = car.get("totalMileage");
+      if (mileage === undefined || mileage === 0) {
+        mileage = car.get("baseMileage");
+      }
+
+      return Parse.Cloud.run("carServicesUpdate", {
+        carVin: car.get("VIN"),
+        mileage: mileage
+      })
+    }
+
+    if (!car.existed()) {
       // notification
-      if(!Parse.User.current().get("firstCar")){
+      if(!Parse.User.current().get("firstCar")) {
         var Notification = Parse.Object.extend("Notification");
         var notificationToSave = new Notification();
         var notificationContent = "Welcome to Pitstop!";
@@ -170,33 +213,18 @@ Parse.Cloud.afterSave("Car", function(request){
         Parse.User.current().set("firstCar", true)
         Parse.User.current().save()
       }
-      
 
       // do recall stuff
       Parse.Cloud.run("recallMastersWrapper", {
         "vin": car.get("VIN"),
         "car": car.id
-      });
+      }).then(function() {
+        next();
 
-      var mileage = car.get("totalMileage");
-      if (mileage === undefined || mileage === 0) {
-        mileage = car.get("baseMileage");
-      }
-
-      // do service stuff
-      Parse.Cloud.run("carServicesUpdate", {
-        carVin: car.get("VIN"),
-        mileage: mileage
-      }, {
-        success: function(result){
-          console.log("success: ");
-          console.log(result);
-        },
-        error: function(error){
-          console.log(error);
-          console.error(error);
-        }
-      });
+      }, function(error) {
+        console.error(error);
+        next();
+      })
     }
 
   // *** Edmunds is no longer used ***
@@ -1337,7 +1365,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       });
    }
 
-   
+
    var carQuery = new Parse.Query("Car");
    carQuery.equalTo("VIN", carVin);
    carQuery.find({
@@ -1356,7 +1384,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
                userQuery.find({
                   success: function (users) {
                      user = users[0];
-                     
+
                      sendEmail (user, car, shop);
                   },
                   error: function (error) {
