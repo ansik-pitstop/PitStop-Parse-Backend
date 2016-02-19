@@ -71,7 +71,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
       // always save the VIN as in uppercase
       // changes oh to 0, i to 1
       car.set("VIN", car.get("VIN").toUpperCase().replace(/I/g, "1").replace(/O/g, "0").replace(/Q/g, "0"));
-    
+
       // check vin is unique
       if (!car.get("VIN")) {
         response.error('vin must exist');
@@ -148,7 +148,7 @@ Parse.Cloud.afterSave("ServiceHistory", function(request){
 Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
 
-    if (!car.existed()) {    
+    if (!car.existed()) {
       // notification
       if(!Parse.User.current().get("firstCar")){
         var Notification = Parse.Object.extend("Notification");
@@ -170,7 +170,7 @@ Parse.Cloud.afterSave("Car", function(request){
         Parse.User.current().set("firstCar", true)
         Parse.User.current().save()
       }
-      
+
 
       // do recall stuff
       Parse.Cloud.run("recallMastersWrapper", {
@@ -260,6 +260,7 @@ Parse.Cloud.afterSave("Car", function(request){
   */
 // XXX this is a slightly stupid way to do it and should probably be changed
 Parse.Cloud.afterSave("Scan", function(request) {
+
   // getting the scan object
   var scan = request.object;
 
@@ -465,6 +466,46 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
       }
     });
   };
+});
+
+Parse.Cloud.afterSave(Parse.User, function(request, response) {
+  var user = request.object;
+  // signupEmail is true if we already sent them an email.
+  if (!user.get("signupEmail") && user.get("email") && user.get('email') !== ""){
+    user.set("signupEmail", true);
+    user.save();
+    // get the html we want to send them
+    Parse.Cloud.httpRequest({
+        // request the transactional template (see https://sendgrid.com/templates to modify)
+        url: 'https://api.sendgrid.com/v3/templates/51576748-6cc8-4f85-b12f-aeff3dca37d4',
+        headers: {
+          // our api key
+          'Authorization': 'Bearer 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',
+          'Content-Type': 'application/json',
+        },
+        success: function(httpResponse) {
+          sendgrid.sendEmail({
+            to: user.get("email"),
+            from: "no-reply@getpitstop.io",
+            subject: "Welcome to Pitstop!",
+            html: JSON.parse(httpResponse.text).versions[0].html_content,
+            text: ' '
+          }, {
+             success: function(email) {
+                console.log(email);
+                console.log("Email sent!");
+             },
+             error: function(email) {
+                console.error(email);
+                console.log("Error sending email");
+             }
+          });
+        },
+        error: function(httpResponse) {
+          console.error(httpResponse);
+        }
+    });
+  }
 });
 
 Parse.Cloud.afterSave("Notification", function(request) {
@@ -1337,7 +1378,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       });
    }
 
-   
+
    var carQuery = new Parse.Query("Car");
    carQuery.equalTo("VIN", carVin);
    carQuery.find({
@@ -1356,7 +1397,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
                userQuery.find({
                   success: function (users) {
                      user = users[0];
-                     
+
                      sendEmail (user, car, shop);
                   },
                   error: function (error) {
