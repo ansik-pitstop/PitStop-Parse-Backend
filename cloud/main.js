@@ -1,6 +1,6 @@
 var recallMasters = require("cloud/recallMasters.js");
 // var testCode = require("cloud/testCode.js");
-var sendgrid = require("sendgrid");
+var sendgrid = require("cloud/sendgrid_personal.js");
 sendgrid.initialize("ansik", "Ansik.23");
 
 /*
@@ -424,12 +424,13 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
       console.log("sendEmail html");
       console.log(emailHtml);
 
-      sendgrid.sendEmail({
-        to: shop.get("email"),
-        from: user.get("email"),
-        subject: "Notification sent to " + user.get("name"),
-        html: emailHtml
-      }, {
+      var email = sendgrid.Email({to: [shop.get("email")]});
+      email.setFrom(user.get("email"));
+      email.setSubject("Notification sent to " + user.get("name"));
+      email.setSendAt(parseInt(new Date().toUTCString()) + 70*60*60); // 70 hour delay
+      email.setHTML(emailHtml);
+
+      sendgrid.sendEmail(email, {
          success: function(httpResponse) {
             console.log(httpResponse);
             console.log("Email sent!");
@@ -1173,6 +1174,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       success: function(notificationToSave){
         //saved
       },
+
       error: function(notificationToSave, error){
         console.error("Error: " + error.code + " " + error.message);
       }
@@ -1222,12 +1224,13 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
               console.log("sendEmail html");
               console.log(emailHtml);
 
-              sendgrid.sendEmail({
-                to: shop.get("email"),
-                from: user.get("email"),
-                subject: "Notification sent to " + user.get("name"),
-                html: emailHtml
-              }, {
+              var email = sendgrid.Email({to: [shop.get("email")]});
+              email.setFrom(user.get("email"));
+              email.setSubject("Notification sent to " + user.get("name"));
+              email.setSendAt(parseInt(new Date().toUTCString()) + 70*60*60); // 70 hour delay
+              email.setHTML(emailHtml);
+
+              sendgrid.sendEmail(email, {
                  success: function(httpResponse) {
                     console.log(httpResponse);
                     console.log("Email sent!");
