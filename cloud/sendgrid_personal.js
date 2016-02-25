@@ -33,7 +33,7 @@
     this.header.category = header.category || [];
     this.header.section = header.section || {};
     this.header.filters = header.filters || {};
-    this.header.send_at = header.send_at || new Date().toUTCString();
+    this.header.send_at = header.send_at || "";
   }
 
   smtpapi.prototype.addTo = function(to) {
@@ -115,7 +115,7 @@
   smtpapi.prototype.jsonString = function() {
     var header = {};
     for (var key in this.header) {
-      if (this.header.hasOwnProperty(key) && (key == "send_at" || Object.keys(this.header[key]).length)) {
+      if (this.header.hasOwnProperty(key) && ((key == "send_at" && this.header[key] != "")|| (key != "send_at" && Object.keys(this.header[key]).length))) {
         header[key] = this.header[key];
       }
     }
@@ -293,7 +293,6 @@
     //Priviledged / Protected
     this.send = function (email, cb) {
       var promise = new Parse.Promise();
-
       Parse.Cloud.httpRequest({
         method: options.method,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
