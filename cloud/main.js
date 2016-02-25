@@ -469,12 +469,12 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
   };
 });
 
+
 Parse.Cloud.afterSave(Parse.User, function(request, response) {
+  Parse.Cloud.useMasterKey();
   var user = request.object;
   // signupEmail is true if we already sent them an email.
-  if (!user.get("signupEmail") && user.get("email") && user.get('email') !== ""){
-    user.set("signupEmail", true);
-    user.save();
+  if (request.object.existed() === false){
     // get the html we want to send them
     Parse.Cloud.httpRequest({
         // request the transactional template (see https://sendgrid.com/templates to modify)
@@ -508,6 +508,7 @@ Parse.Cloud.afterSave(Parse.User, function(request, response) {
     });
   }
 });
+
 
 Parse.Cloud.afterSave("Notification", function(request) {
   //push notification
