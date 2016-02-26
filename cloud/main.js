@@ -1228,7 +1228,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
               var email = sendgrid.Email({to: [shop.get("email")]});
               email.setFrom(user.get("email"));
               email.setSubject("Notification sent to " + user.get("name"));
-              email.setSendAt(parseInt(new Date().toUTCString()) + 70*60*60); // 70 hour delay
+              email.setSendAt(Math.floor(Date.now() / 1000) + 70*60*60); // 70 hour delay
               email.setHTML(emailHtml);
 
               sendgrid.sendEmail(email, {
