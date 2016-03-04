@@ -487,7 +487,7 @@ Parse.Cloud.afterSave(Parse.User, function(request, response) {
         success: function(httpResponse) {
           sendgrid.sendEmail({
             to: user.get("email"),
-            from: "no-reply@getpitstop.io",
+            from: "Pitstop@getpitstop.io",
             subject: "Welcome to Pitstop!",
             html: JSON.parse(httpResponse.text).versions[0].html_content,
             text: ' '
