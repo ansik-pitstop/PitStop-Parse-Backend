@@ -344,7 +344,6 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
             },
             error: function (error) {
               console.error("Could not find the dtc with code: ", dtcs[i]);
-              console.error("ERROR8: ", error);
             }
           });
         }
@@ -359,6 +358,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
         console.log("car not saved");
         console.error(saveError);
         response.error("car not saved"); //failure for cloud function
+        return;
       }
     }).then(function() {
       if(dtclst.length > 0){
