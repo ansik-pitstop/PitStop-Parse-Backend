@@ -1146,6 +1146,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     var highestMileage = 0;
     var servicesDue = [];
     var prioritySum = 0;
+    var maxPriority = 1;
     if (edmunds) { // true = edmunds is used, false = dealer services.
 
       /* get rid of duplicate services with same mileage
@@ -1198,6 +1199,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       // add new services to the servicesDue array
       for (i = 0; i < serviceStack.length; i++) {
         var service = serviceStack[i];
+        if (service.get("priority") > maxPriority){
+          maxPriority = service.get("priority");
+        }
         prioritySum += service.get("priority");
         // if they arent already in it
         if (servicesDue.indexOf(service.id) === -1 && servicesDue.length < 5){ // to a limit of 5
@@ -1215,7 +1219,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       // if services due == 0, then there is a pending fixed or interval
       // thus when checking the priority sum, we know there are services due, so check priority > 5
       if(servicesDue.length === 0 || prioritySum > 5) {
-        saveNotification(servicesDue);
+        saveNotification(servicesDue, maxPriority);
       }
       car.set("serviceDue", true);
     } else {
@@ -1236,7 +1240,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   };
 
   //saves new notifications
-  var saveNotification = function (servicesDue) {
+  var saveNotification = function (servicesDue, maxPriority) {
     //set notifications object
     var Notification = Parse.Object.extend("Notification");
     var notificationToSave = new Notification();
@@ -1248,6 +1252,17 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     }else{
       notificationContent+= " service due";
       notificationTitle+= "a service due";
+    }
+
+    // severity based on https://github.com/ansik-pitstop/Pitstop-Wiki/wiki/Priority-and-Severity
+    if (maxPriority == 1){
+      notificationTitle += " (Low)";
+    } else if (maxPriority == 2) {
+      notificationTitle += " (Medium)";
+    } else if (maxPriority == 3) {
+      notificationTitle += " (High)";
+    } else if (maxPriority > 3) {
+      notificationTitle += " (Severe)";
     }
 
     /*
