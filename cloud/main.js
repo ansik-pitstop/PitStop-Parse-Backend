@@ -34,7 +34,7 @@ var EDMUNDS_API = {
 
 Parse.Cloud.beforeSave("Scan", function(request,response){
   var PIDArray = request.object.get("PIDArray");
-  if(PIDArray){
+  if(request.object.isNew() && PIDArray){
     for(var i = 0; i < PIDArray.length; i++) {
       pids = PIDArray[i]['pids'];
       if (pids){
@@ -46,7 +46,7 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
             if(data.indexOf(',') !== -1) {
               continue;
             }
-            
+
             var x2 = parseInt(data.substring(0,2),16);
             var x1 = 0;
             if (data.length > 2){
