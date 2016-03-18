@@ -30,6 +30,80 @@ var EDMUNDS_API = {
 
 };
 
+
+
+Parse.Cloud.beforeSave("Scan", function(request,response){
+  var PIDArray = request.object.get("PIDArray");
+  if(PIDArray){
+    for(var i = 0; i < PIDArray.length; i++) {
+      pids = PIDArray[i]['pids'];
+      if (pids){
+        for(var j = 0; j < pids.length; j++){
+          var id = pids[j]['id'];
+          var data = pids[j]['data'];
+          if (data) {
+            // device occasionally dumps all data
+            if(data.indexOf(',') !== -1) {
+              continue;
+            }
+            
+            var x2 = parseInt(data.substring(0,2),16);
+            var x1 = 0;
+            if (data.length > 2){
+              x1 = parseInt(data.substring(2,4),16);
+            }
+            data = parseInt(data, 16);
+
+            if (id === "2105" || id === "210F") {
+              data = data-40.0;
+            }
+            else if (id === "210C") {
+              data = ((x2*256)+x1)*16384.0/65535.0;
+            }
+            else if (id === "2110") {
+              data = ((x2*256)+x1)*0.01;
+            }
+            else if (id === "210E") {
+              data = data*127.0/(255.0-64.0);
+            }
+            else if (id === "2104" || id === "2111") {
+              data = data*100.0/255.0;
+            }
+            else if (id === "210A") {
+              data = data*3.0;
+            }
+            else if (id === "2114" || id === "2115" || id === "2116" || id === "2117" || id === "2118" || id === "2119" || id === "211A" || id === "211B") {
+              data = data*1.275/255.0;
+            }
+            else if (id === "2106" || id === "2150" || id === "2151" || id === "2107" || id === "2108" || id === "2109" || id === "212D") {
+              data = (data*199.2)/(255.0-100.0);
+            }
+            else if (id === "211F" || id === "2121") {
+              data = (x2*256.0)+x1;
+            }
+            else if (id === "2122") {
+              data = ((x2*256.0)+x1)*5177.265/65535.0;
+            }
+            else if (id === "2123") {
+              data = ((x2*256.0)+x1)*10.0;
+            }
+            else if (id === "2152" || id === "2153" || id === "2154" || id === "2155" ) {
+              data = ((x2*256.0)+x1)*7.995/65535.0;
+            }
+            else if (id === "2124" || id === "2125" || id === "2126" || id === "2127" || id === "2128" || id === "2129" || id === "212A" || id === "212B") {
+              data = ((x2*256.0)+x1)*1.999/65535.0;
+            }
+            pids[j]['data'] = data;
+          }
+        }
+      }
+      PIDArray[i]['pids'] = pids;
+    }
+    request.object.set('PIDArray', PIDArray);
+  }
+  response.success();
+});
+
 Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
     var edmundsId = request.object.get("edmundsId");
     var edmundsQuery = new Parse.Query("EdmundsRecall");
