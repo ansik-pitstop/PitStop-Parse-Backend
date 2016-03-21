@@ -42,8 +42,12 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
           var id = pids[j]['id'];
           var data = pids[j]['data'];
           if (data) {
-            // device occasionally dumps all data
+            // device occasionally dumps all data, remove this from pids
             if(data.indexOf(',') !== -1) {
+              var index = PIDArray[i]['pids'].indexOf(PIDArray[i]['pids'][j]);
+              if (index > -1){
+                PIDArray[i]['pids'].splice(index, 1);
+              }
               continue;
             }
 
