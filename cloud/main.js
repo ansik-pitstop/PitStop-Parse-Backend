@@ -38,16 +38,15 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
     for(var i = 0; i < PIDArray.length; i++) {
       pids = PIDArray[i]['pids'];
       if (pids){
-        for(var j = 0; j < pids.length; j++){
+        // iterate backwards so we can remove things as we go through
+        for(var j = pids.length -1; j >= 0; j--){
           var id = pids[j]['id'];
           var data = pids[j]['data'];
           if (data) {
             // device occasionally dumps all data, remove this from pids
             if(data.indexOf(',') !== -1) {
-              var index = PIDArray[i]['pids'].indexOf(PIDArray[i]['pids'][j]);
-              if (index > -1){
-                PIDArray[i]['pids'].splice(index, 1);
-              }
+              var index = pids.indexOf(pids[j]);
+              pids.splice(index, 1);
               continue;
             }
 
