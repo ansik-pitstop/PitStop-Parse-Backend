@@ -31,7 +31,6 @@ var EDMUNDS_API = {
 };
 
 
-
 Parse.Cloud.beforeSave("Scan", function(request,response){
   var PIDArray = request.object.get("PIDArray");
   if(request.object.isNew() && PIDArray){
@@ -48,7 +47,7 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
               var index = pids.indexOf(pids[j]);
               pids.splice(index, 1);
               continue;
-            }
+            } 
 
             var x2 = parseInt(data.substring(0,2),16);
             var x1 = 0;
@@ -61,13 +60,13 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
               data = data-40.0;
             }
             else if (id === "210C") {
-              data = ((x2*256)+x1)*16384.0/65535.0;
+              data = ((x2*256.0)+x1)/4.0;
             }
             else if (id === "2110") {
-              data = ((x2*256)+x1)*0.01;
+              data = ((x2*256.0)+x1)*0.01;
             }
             else if (id === "210E") {
-              data = data*127.0/(255.0-64.0);
+              data = (data*127.0/255.0)-64.0;
             }
             else if (id === "2104" || id === "2111") {
               data = data*100.0/255.0;
@@ -78,14 +77,14 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
             else if (id === "2114" || id === "2115" || id === "2116" || id === "2117" || id === "2118" || id === "2119" || id === "211A" || id === "211B") {
               data = data*1.275/255.0;
             }
-            else if (id === "2106" || id === "2150" || id === "2151" || id === "2107" || id === "2108" || id === "2109" || id === "212D") {
-              data = (data*199.2)/(255.0-100.0);
+            else if (id === "2106" || id === "2150" || id === "2151" || id === "2107" || id === "2108" || id === "2109") {
+              data = (data-128.0)*100.0/128.0;
             }
             else if (id === "211F" || id === "2121") {
               data = (x2*256.0)+x1;
             }
             else if (id === "2122") {
-              data = ((x2*256.0)+x1)*5177.265/65535.0;
+              data = ((x2*256.0)+x1)*0.079;
             }
             else if (id === "2123") {
               data = ((x2*256.0)+x1)*10.0;
@@ -96,6 +95,9 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
             else if (id === "2124" || id === "2125" || id === "2126" || id === "2127" || id === "2128" || id === "2129" || id === "212A" || id === "212B") {
               data = ((x2*256.0)+x1)*1.999/65535.0;
             }
+            else if (id === "2101") {
+              data = data % 128;
+            } 
             pids[j]['data'] = data;
           }
         }
