@@ -47,7 +47,7 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
               var index = pids.indexOf(pids[j]);
               pids.splice(index, 1);
               continue;
-            } 
+            }
 
             var x2 = parseInt(data.substring(0,2),16);
             var x1 = 0;
@@ -97,7 +97,7 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
             }
             else if (id === "2101") {
               data = data % 128;
-            } 
+            }
             pids[j]['data'] = data;
           }
         }
@@ -343,8 +343,8 @@ Parse.Cloud.afterSave("Car", function(request){
             console.error("Error: " + error.code + " " + error.message);
           }
         });
-        Parse.User.current().set("firstCar", true)
-        Parse.User.current().save()
+        Parse.User.current().set("firstCar", true);
+        Parse.User.current().save();
       }
 
 
@@ -968,10 +968,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
               fixedDesc.push([service.get("item"),service.get("action")]);
             }
           }
-        }).then(function() {
-          car.set("pendingFixedServices", pendingFixed);
-        }, function(error) {
-          alert("Error: " + error.code + " " + error.message);
         });
 
         // DEALER INTERVAL BASED SERVICE
@@ -1010,7 +1006,6 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             }
           }
         }).then(function() {
-          car.set("pendingIntervalServices", pendingInterval);
           // if no dealership, show edmunds services
           // XXX there should be a better way to do this: a boolean in shop table?
           if (!dealerServices) { // has no dealer or no dealershsips
@@ -1226,6 +1221,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     var servicesDue = [];
     var prioritySum = 0;
     var maxPriority = 1;
+    var changed;
     if (edmunds) { // true = edmunds is used, false = dealer services.
 
       /* get rid of duplicate services with same mileage
@@ -1287,14 +1283,33 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
           servicesDue.push(service.id);
         }
       }
-      car.set("pendingEdmundServices", servicesDue);
-      car.set("pendingIntervalServices", []);
-      car.set("pendingFixedServices", []);
+      // see if we are setting new values
+      if((car.get("pendingEdmundServices") === servicesDue) &&
+        (car.get("pendingIntervalServices") === []) &&
+        (car.get("pendingFixedServices") === [])){
+        changed = false;
+      } else {
+        car.set("pendingEdmundServices", servicesDue);
+        car.set("pendingIntervalServices", []);
+        car.set("pendingFixedServices", []);
+        changed = true;
+      }
     } else { // edmunds isnt used
-      car.set("pendingEdmundServices", []);
+      // see if we are setting new values
+      if((car.get("pendingEdmundServices") === []) &&
+        (car.get("pendingIntervalServices") === pendingInterval) &&
+        (car.get("pendingFixedServices") === pendingFixed)){
+        changed = false;
+      } else {
+        car.set("pendingEdmundServices", []);
+        car.set("pendingIntervalServices", pendingInterval);
+        car.set("pendingFixedServices", pendingFixed);
+        changed = true;
+      }
     }
 
-    if (pendingFixed.length + pendingInterval.length + servicesDue.length > 0) {
+    // if there are services and they are new, send a notification
+    if (changed && (pendingFixed.length + pendingInterval.length + servicesDue.length > 0)) {
       // if services due == 0, then there is a pending fixed or interval
       // thus when checking the priority sum, we know there are services due, so check priority > 5
       if(servicesDue.length === 0 || prioritySum > 5) {
