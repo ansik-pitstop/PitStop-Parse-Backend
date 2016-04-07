@@ -1186,7 +1186,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
          the .4 is to only show services on a new car that are recent
          EX: so if you put in your car at 100K, we dont show services that should have been done from 0-60k */
       if (freq === 3 && !history){
-        if((carMileage*0.4) > (carMileage - intMileage) > -500){
+        if((carMileage*0.4) > (carMileage - intMileage) && (carMileage - intMileage) > -500){
           save = true;
         }
       // frequency 4 means the service is done repeatedly at intervals of the specified intervalMileage
