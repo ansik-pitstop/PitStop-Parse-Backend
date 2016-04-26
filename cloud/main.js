@@ -8,7 +8,6 @@ sendgrid.initialize("ansik", "Ansik.23");
  */
 
 var EDMUNDS_API = {
-
    host: "api.edmunds.com",
    tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
     requestPaths: {
@@ -31,6 +30,7 @@ var EDMUNDS_API = {
 
 Parse.Cloud.beforeSave("Scan", function(request,response){
   var PIDArray = request.object.get("PIDArray");
+  // process pids and convert from hex to dec
   if(request.object.isNew() && PIDArray){
     for(var i = 0; i < PIDArray.length; i++) {
       pids = PIDArray[i]['pids'];
@@ -39,7 +39,7 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
         for(var j = pids.length -1; j >= 0; j--){
           var id = pids[j]['id'];
           var data = pids[j]['data'];
-          if (data) {
+          if (data && typeof data === 'string') {
             // device occasionally dumps all data, remove this from pids
             if(data.indexOf(',') !== -1) {
               var index = pids.indexOf(pids[j]);
@@ -104,7 +104,28 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
     }
     request.object.set('PIDArray', PIDArray);
   }
-  response.success();
+
+  // match scannerid to vin
+  // scannerid is required (otherwise the scan is useless)
+  if (!request.object.get('scannerId')) {
+    response.error("Scannerid undefined");
+  } else {
+    var carQuery = new Parse.Query("Car");
+    carQuery.equalTo("scannerId", request.object.get("scannerId"));
+    // only worry about one.. if there are multiple its not our job to fix it
+    carQuery.first({
+      success: function (car) {
+        if (car) {
+          request.object.set('VIN', car.get("VIN"));
+        }
+        // if no car matches save anyways
+        response.success();
+      },
+      error: function(error){
+        response.error("Scan BeforeSave query error: "+error);
+      }
+    });
+  }
 });
 
 Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
