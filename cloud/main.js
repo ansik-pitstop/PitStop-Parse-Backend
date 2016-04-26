@@ -33,6 +33,7 @@ var EDMUNDS_API = {
 
 Parse.Cloud.beforeSave("Scan", function(request,response){
   var PIDArray = request.object.get("PIDArray");
+  // process pids and convert from hex to dec
   if(request.object.isNew() && PIDArray){
     for(var i = 0; i < PIDArray.length; i++) {
       pids = PIDArray[i]['pids'];
@@ -106,9 +107,29 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
     }
     request.object.set('PIDArray', PIDArray);
   }
-  response.success();
-});
 
+  // match scannerid to vin
+  // scannerid is required (otherwise the scan is useless)
+  if (!request.object.get('scannerId')) {
+    response.error("Scannerid undefined");
+  } else {
+    var carQuery = new Parse.Query("Car");
+    carQuery.equalTo("scannerId", request.object.get("scannerId"));
+    // only worry about one.. if there are multiple its not our job to fix it
+    carQuery.first({
+      success: function (car) {
+        if (car) {
+          request.object.set('VIN', car.get("VIN"));
+        }
+        // if no car matches save anyways
+        response.success();
+      },
+      error: function(error){
+        response.error("Scan BeforeSave query error: "+error);
+      }
+    });
+  }
+});
 Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
     var edmundsId = request.object.get("edmundsId");
     var edmundsQuery = new Parse.Query("EdmundsRecall");
