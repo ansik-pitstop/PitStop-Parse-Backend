@@ -1070,8 +1070,8 @@ Parse.Cloud.define("addEdmundsRecalls", function(request, status) {
     });
 });
 
+// function that manages all the services for the car, also the edmunds services (which should be decoupled)
 Parse.Cloud.define("carServicesUpdate", function(request, response) {
-  //request object is scan
   scan = request.params;
 
   // Initializing variables
@@ -1126,6 +1126,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   var foundCar = function (loadedCar) {
     // assigning the loadedCar to global car
     car = loadedCar;
+
+    // we pass mileage with the scan object
     var scanMileage = scan["mileage"];
     if (scanMileage === undefined){
       scanMileage = 0;
@@ -1137,19 +1139,21 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     } else {
       if (car.get("totalMileage") === undefined ||
           car.get("totalMileage") === 0) {
-        carMileage = car.get("baseMileage") + scanMileage;
+        carMileage = car.get("baseMileage");
       } else {
-        carMileage = car.get("totalMileage") + scanMileage;
+        carMileage = car.get("totalMileage");
       }
     }
     car.set("totalMileage", carMileage);
 
+    // i dont think anyone knows why this is done
     if (scan["freezeData"] !== undefined){   //exists
       if (scan["freezeData"] !== "[]"){  //not empty
         car.AddUnique("storedFreezeFrames", scan["freezeData"]);
       }
     }
 
+    // get history of each of the 3 services for the car
     var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
     ServiceHistoryQuery.equalTo("carId", car.id);
     ServiceHistoryQuery.each(function (history) {
@@ -1164,6 +1168,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         intervalHistory.push([objID, mileage]);
       }
     }).then(function(){
+      // if we have a dealership we do the dealerships services, otherwise we use edmunds
       if(car.get("dealership")) {
         // DEALER FIXED SERVICES
         var fixed = new Parse.Query("ServiceFixed");
@@ -1226,7 +1231,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }).then(function() {
           // if no dealership, show edmunds services
           // XXX there should be a better way to do this: a boolean in shop table?
-          if (!dealerServices) { // has no dealer or no dealershsips
+          if (!dealerServices) { // car has no dealership or dealership has no services
             console.log("dealership but no dealer services");
             readEdmundsServices();
           } else {
@@ -1245,6 +1250,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     });
 };
 
+  // no dealership or dealership services, so use edmijds
    var readEdmundsServices = function () {
     // query for the Edmunds Services associated with this Car
     var edmundsQuery = new Parse.Query("EdmundsService");
@@ -1605,6 +1611,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       }
     });
 
+    // servicesDue.length === 0 means that there are no edmunds services, which means there are dealerservices
+    // we dont notify anyone about edmunds services
+    // so if below condition is true, there are dealer services and we will send an email to the dealer about it
     if(servicesDue.length === 0){
       shopQuery = new Parse.Query("Shop");
       shopQuery.equalTo("objectId", car.get("dealership"));
@@ -1652,7 +1661,11 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
               var email = sendgrid.Email({to: [shop.get("email")]});
               email.setFrom(user.get("email"));
               email.setSubject("Notification sent to " + user.get("name"));
-              email.setSendAt(Math.floor(Date.now() / 1000) + 70*60*60); // 70 hour delay
+
+              // we need to delay the email by 70 hours to give them time to respond - shiva
+              // sendat is limited to 72 hours in the future i think.
+              // see sengrid.js for the code that implements all this. we use a modified version of it to allow for this
+              email.setSendAt(Math.floor(Date.now() / 1000) + 70*60*60); // 60 seconds * 60 minutes * 70 hours = 70 hour delay
               email.setHTML(emailHtml);
 
               sendgrid.sendEmail(email, {
@@ -1681,6 +1694,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
   };
 }); // END CAR SERVICES UPDATE
 
+// is no longer run, used to update cars mileage every week
 Parse.Cloud.job("autoMileageUpdate", function(request, status) {
   Parse.Cloud.useMasterKey;
   //var config = Parse.Config.current();
@@ -1721,6 +1735,7 @@ Parse.Cloud.job("autoMileageUpdate", function(request, status) {
   });
 });
 
+// if they press service request on phone this is what is run
 Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
    var params = request.params;
    var services = params.services;
@@ -1806,7 +1821,7 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
       });
    }
 
-
+   // this gets all the params needed to run above function, then runs it.
    var carQuery = new Parse.Query("Car");
    carQuery.equalTo("VIN", carVin);
    carQuery.find({
@@ -1825,7 +1840,6 @@ Parse.Cloud.define("sendServiceRequestEmail", function(request, response) {
                userQuery.find({
                   success: function (users) {
                      user = users[0];
-
                      sendEmail (user, car, shop);
                   },
                   error: function (error) {
