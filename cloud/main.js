@@ -6,9 +6,7 @@ sendgrid.initialize("ansik", "Ansik.23");
 /*
  Constants + Config
  */
-
 var EDMUNDS_API = {
-
    host: "api.edmunds.com",
    tail: "fmt=json&api_key=9mu2f8rw93jaxtsj9dqkbtsx",
     requestPaths: {
@@ -30,11 +28,13 @@ var EDMUNDS_API = {
 
 };
 
-
+// this converts the pids from hex to dec, as specified by the device documents.
 Parse.Cloud.beforeSave("Scan", function(request,response){
   var PIDArray = request.object.get("PIDArray");
-  // process pids and convert from hex to dec
+  // only do for new objects
   if(request.object.isNew() && PIDArray){
+    // pid array is a loop of pid timestamps
+    // ex; Pidarray: [[pids:[id: 210d, data: 0000, id:210c, data:FF00], timestamp:unixtime], [pids:....]]
     for(var i = 0; i < PIDArray.length; i++) {
       pids = PIDArray[i]['pids'];
       if (pids){
@@ -43,20 +43,26 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
           var id = pids[j]['id'];
           var data = pids[j]['data'];
           if (data) {
-            // device occasionally dumps all data, remove this from pids
+            // device occasionally dumps repeated data as a large object, so delete that
+            // ex: 1...2....3...4...5...(1,2,3,4,5)
             if(data.indexOf(',') !== -1) {
               var index = pids.indexOf(pids[j]);
+              // delete from pids
               pids.splice(index, 1);
               continue;
             }
 
+            // the first 2 hex bytes as int
             var x2 = parseInt(data.substring(0,2),16);
             var x1 = 0;
             if (data.length > 2){
+              // the second 2 hex bytes as int
               x1 = parseInt(data.substring(2,4),16);
             }
+            // overall hex as int
             data = parseInt(data, 16);
 
+            // see specs for more info on these conversion functions
             if (id === "2105" || id === "210F") {
               data = data-40.0;
             }
@@ -99,16 +105,19 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
             else if (id === "2101") {
               data = data % 128;
             }
+            // save new pid
             pids[j]['data'] = data;
           }
         }
       }
+      // save new converted pids
       PIDArray[i]['pids'] = pids;
     }
+    // save new converted pidarray
     request.object.set('PIDArray', PIDArray);
   }
 
-  // match scannerid to vin
+  // match scannerid to current vin (as it changes over time)
   // scannerid is required (otherwise the scan is useless)
   if (!request.object.get('scannerId')) {
     response.error("Scannerid undefined");
@@ -130,6 +139,8 @@ Parse.Cloud.beforeSave("Scan", function(request,response){
     });
   }
 });
+
+// only save unique recalls
 Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
     var edmundsId = request.object.get("edmundsId");
     var edmundsQuery = new Parse.Query("EdmundsRecall");
@@ -149,15 +160,16 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response){
             response.error("EdmundsRecall BeforeSave query error: "+error);
         }
     });
-
 });
 
+// verify mileage is correctt
 Parse.Cloud.beforeSave("TripMileage", function(request, response){
   var trip = request.object;
   if (trip.isNew()) {
     if (trip.get("mileage") <= 0) {
       response.error("mileage must be positive");
     } else {
+      // dont save multiple trips
       var query = new Parse.Query("TripMileage");
       query.equalTo("tripId", trip.get("tripId"));
       query.equalTo("scannerId", trip.get("scannerId"));
@@ -179,20 +191,28 @@ Parse.Cloud.beforeSave("TripMileage", function(request, response){
   }
 });
 
+// update car with new mileage
 Parse.Cloud.afterSave("TripMileage", function(request, response){
   var trip = request.object;
+  // talk to mobile devs for the reasons behind tripflag/bluetoothconnection
   if (!trip.existed() && (trip.get("tripFlag") === "9") && (trip.get("bluetoothConnection") === "connected")) {
     var carQuery = new Parse.Query("Car");
-    // filter for same dealership and mileage less than current total
+    // filter for car
     carQuery.equalTo("scannerId", trip.get("scannerId"));
     carQuery.first({
       success: function (car) {
         if (car) {
           var newMileage = car.get("totalMileage");
+          // query for similar tripmileages for this car, with same id.
           var query = new Parse.Query("TripMileage");
           query.equalTo("tripId", trip.get("tripId"));
           query.equalTo("scannerId", trip.get("scannerId"));
           query.notEqualTo("objectId", trip.id);
+
+          // mobile will post multiple trip mileages for one "trip", with a trip being when you turn car on till you turn it off.
+          // we only want to add the final mileage
+          // ex, you drive 5km total, you get a post of 1km,2km,3km,4km, and then 5km for the trip.
+          // so keep the car updated with the highest mileage of the trip.
           query.find({
             success: function (data) {
               if (data){
@@ -203,13 +223,17 @@ Parse.Cloud.afterSave("TripMileage", function(request, response){
                     maxMileage = data[i].get("mileage");
                   }
                 }
+
+                // if max mileage is less than the current one, we want to increase the cars mileage by the difference between them
                 if (maxMileage < trip.get("mileage")){
                   // increase by difference
                   var diff = trip.get("mileage") - maxMileage;
                   newMileage += diff;
-                  //fix precision issues
+
+                  // this fixes precision issues
                   car.set("totalMileage", Math.round(newMileage * 100) / 100);
                 } else {
+                  // maxmileage is greater or equal to this trip, so do nothing
                   return;
                 }
               } else {
@@ -222,6 +246,7 @@ Parse.Cloud.afterSave("TripMileage", function(request, response){
               car.save(null, {
                 success: function (savedCar) {
                   console.log("car saved");
+                  // mileage updated, so run carserviceupdate
                   Parse.Cloud.run("carServicesUpdate", {
                     carVin: car.get("VIN")
                   });
@@ -247,26 +272,25 @@ Parse.Cloud.afterSave("TripMileage", function(request, response){
   }
 });
 
-
-/*
- Car beforeSave: add recall information
-*/
 Parse.Cloud.beforeSave("Car", function(request, response){
   var car = request.object;
   if (car.isNew()) { // car doesnt exist yet
+    // set array fields to default values of empty
     car.set("pendingIntervalServices", []);
     car.set("pendingEdmundServices", []);
     car.set("pendingFixedServices", []);
     car.set("storedDTCs", []);
 
+    // if no mileage given set to 0
     if (!car.get("baseMileage")) {
       car.set("baseMileage", 0);
     }
 
+    // set total to base mileage.
     car.set("totalMileage", car.get("baseMileage"));
 
     // always save the VIN as in uppercase
-    // changes oh to 0, i to 1
+    // changes O to 0, i to 1, Q to 0
     car.set("VIN", car.get("VIN").toUpperCase().replace(/I/g, "1").replace(/O/g, "0").replace(/Q/g, "0"));
 
     // check vin is unique
@@ -291,7 +315,7 @@ Parse.Cloud.beforeSave("Car", function(request, response){
       });
     }
   } else { // car already existed
-    // temporary for main branch
+    // temporary for main branch, to fix old cars before the default above values were set
     if(!car.get("pendingIntervalServices")){
       car.set("pendingIntervalServices", []);
     }
@@ -305,6 +329,8 @@ Parse.Cloud.beforeSave("Car", function(request, response){
       car.set("storedDTCs", []);
     }
 
+    // set number of services every time a car is updated
+    // mobile should do this... no reason to have a column for this.
     var numberServices = 0;
     numberServices += car.get("pendingIntervalServices").length +
       car.get("pendingEdmundServices").length +
@@ -315,9 +341,8 @@ Parse.Cloud.beforeSave("Car", function(request, response){
   }
 });
 
-/*
- servicehistory aftersave: update services
- */
+// if service history is updated, it means a service for a car was probably marked done
+// so we need to run carserviceupdate again, so it is removed from its respective array (pending....services)
 Parse.Cloud.afterSave("ServiceHistory", function(request){
   if (!request.object.existed()) {
     var carQuery = new Parse.Query("Car");
@@ -338,15 +363,12 @@ Parse.Cloud.afterSave("ServiceHistory", function(request){
   }
 });
 
-
-/*
- Car aftersave: load calibration services
- */
 Parse.Cloud.afterSave("Car", function(request){
     var car = request.object;
 
+    // new car
     if (!car.existed()) {
-      // notification
+      // send signup notification
       if(!Parse.User.current().get("firstCar")){
         var Notification = Parse.Object.extend("Notification");
         var notificationToSave = new Notification();
@@ -368,19 +390,19 @@ Parse.Cloud.afterSave("Car", function(request){
         Parse.User.current().save();
       }
 
-
-      // do recall stuff
+      // do recall stuff... ask jiawei whats going on in recallmasterswrapper
       Parse.Cloud.run("recallMastersWrapper", {
         "vin": car.get("VIN"),
         "car": car.id
       });
 
+      // totalmileage should never be undefined
       var mileage = car.get("totalMileage");
       if (mileage === undefined || mileage === 0) {
         mileage = car.get("baseMileage");
       }
 
-      // do service stuff
+      // run carservice update
       Parse.Cloud.run("carServicesUpdate", {
         carVin: car.get("VIN"),
         mileage: mileage
@@ -452,20 +474,10 @@ Parse.Cloud.afterSave("Car", function(request){
   //should run job/func here to update services/mileage at an interval
 });
 
- /*
-  afterSave Event for Scan Object
-  */
-// XXX this is a slightly stupid way to do it and should probably be changed
 Parse.Cloud.afterSave("Scan", function(request) {
-
-  // getting the scan object
   var scan = request.object;
 
-  // stopping the function if not required
-  if (scan.get("runAfterSave") !== true) {
-    return;
-  }
-
+  // if dtcdata, it means their are dtcs for the car, so go do updateDTCS
   var dtcData = scan.get("DTCs");
   if ( dtcData !== undefined && dtcData !== ""){
     Parse.Cloud.run("updateDtcs", {
@@ -485,7 +497,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     });
   }
 
-    // real time processing
+  // real time processing
   if (!request.object.existed()) {
     var scannerValues = {};
     var scanner;
@@ -493,6 +505,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
     var car;
     var carQuery = new Parse.Query("Car");
     carQuery.equalTo("scannerId", request.object.get("scannerId"));
+    // need to get car and owner, asynch..
     carQuery.first({
         success: function(data){
               if (data){
@@ -506,32 +519,38 @@ Parse.Cloud.afterSave("Scan", function(request) {
               console.error(error);
           }
     }).then(function() {
+      // the scanner table is something that keeps track of various running values, for each pid, for each car.
+      // for example, it might track the average, high, and low, of a pid such as 210D
       var query = new Parse.Query("Scanner");
       query.equalTo("scannerId", request.object.get("scannerId"));
       query.first({
-          success: function(data){
-                if (data){
-                  scanner = data;
-                  var jsonData = data.toJSON();
-                  for(var key in jsonData) {
-                    if (key == "scannerId" || key == "objectId" || key == "updatedAt" || key == "createdAt") {
-                      continue;
-                    }
-                    // column name to row value
-                    // the column names are variable so we have to do this (aka what pids... 30? 20?)
-                    scannerValues[key] = data.get(key);
-                  }
-                } else {
-                  scanner = new Parse.Object("Scanner");
-                  scanner.set("scannerId", request.object.get("scannerId"));
+        success: function(data){
+            if (data){
+              scanner = data;
+              var jsonData = data.toJSON();
+              for(var key in jsonData) {
+                // we want to ignore these keys
+                if (key == "scannerId" || key == "objectId" || key == "updatedAt" || key == "createdAt") {
+                  continue;
                 }
-            },
-            error: function(error){
-                console.error(error);
+
+                // store all other columns in dictionaries.. we dont know what they are so this is done dynamically
+                scannerValues[key] = data.get(key);
+              }
+            } else {
+              // create a new one scanner if it doesnt exist yet.
+              scanner = new Parse.Object("Scanner");
+              scanner.set("scannerId", request.object.get("scannerId"));
             }
+          },
+          error: function(error){
+            console.error(error);
+          }
       }).then(function() {
+        // remember this is aftersave scan, so we have a single pidarray we are going to process
         var PIDArray = request.object.get("PIDArray");
         if (PIDArray) {
+          // loop through the individual pids, and "process", them
           for(var i = 0; i < PIDArray.length; i++) {
             pids = PIDArray[i]['pids'];
             if (pids){
@@ -539,8 +558,9 @@ Parse.Cloud.afterSave("Scan", function(request) {
             }
           }
 
-          // update scanner to new values
+          // update scanner to new values.. process pids updates scannervalues async
           for(var key in scannerValues) {
+            // this creates new columns if they dont exist
             scanner.set(key, scannerValues[key]);
           }
           scanner.save(null, {
@@ -560,106 +580,128 @@ Parse.Cloud.afterSave("Scan", function(request) {
     });
   }
 
+  // this processes an indivudal "pids", which is an object in the array PIDArray, a slice of the pid values at a point in time
   function processPids (pids, timestamp, owner) {
-      var hash = {};
-      for(var j = 0; j < pids.length; j++){
-        var id = pids[j]['id'];
-        var data = pids[j]['data'];
-        if (data !== undefined && id) {
-          hash[id] = data;
-        }
+    // get all keys, or pid ids, and put them in a dictionary.
+    var hash = {};
+    for(var j = 0; j < pids.length; j++){
+      var id = pids[j]['id'];
+      var data = pids[j]['data'];
+      if (data !== undefined && id) {
+        hash[id] = data;
       }
+    }
 
-      if ("210D" in hash && "210C" in hash &&
-          (hash["210D"] === 0 && hash["210C"] === 0)) {
-        // reset all values in scannerValues to 0
-        for (var key in scannerValues) {
-          scannerValues[key] = 0;
-        }
-      } else {
-        for (var key2 in hash) {
-          if (!(key2 === "2106" || key2 === "2105") || //only on 2106 for now.
-          key2 === "210D" || key2 === "210C") { // no need to track speed/rpm
-            continue;
+    // if these values are 0, the car is not running. shyams words, not mine. rpm and speed i think.
+    if ("210D" in hash && "210C" in hash &&
+        (hash["210D"] === 0 && hash["210C"] === 0)) {
+      // reset all values in scannerValues to 0
+      for (var key in scannerValues) {
+        // the running values restart everytime you start the car
+        scannerValues[key] = 0;
+      }
+    } else {
+      // we are still driving, so update the old scannerValues
+      for (var key2 in hash) {
+        // shyam only wants to track 2106 and 2105 right now, remove that and it will track them all
+        // dont track 210d and 210c (they are speed and rpm, they change alot, no indication of problems)
+        if (!(key2 === "2106" || key2 === "2105") ||
+        key2 === "210D" || key2 === "210C") { // no need to track speed/rpm
+          continue;
+        } else {
+          // these are algorithms written by other people, again, talk to shyam if you want to understand it.
+          var runSum,tRunSum,points;
+
+          // runningSum2106... runningSum2105 is the column name
+          // if it already exists we will add the current value to this 'running sum'
+          if (("runningSum"+key2) in scannerValues) {
+            runSum = scannerValues["runningSum"+key2] + hash[key2];
           } else {
-            var runSum,tRunSum,points;
-            if (("runningSum"+key2) in scannerValues) {
-              runSum = scannerValues["runningSum"+key2] + hash[key2];
-            } else {
-              runSum = hash[key2];
-            }
-            if (("points"+key2) in scannerValues) {
-              points = scannerValues["points"+key2] + 1;
-            } else {
-              points = 1;
-            }
-            if (("tVarRunningSum"+key2) in scannerValues) {
-              var tvar = Math.pow(hash[key2] - (runSum/points), 2);
-              tRunSum = scannerValues["tVarRunningSum"+key2] + tvar;
-            } else {
-              tRunSum = 0;
-            }
-            var variance = tRunSum / (points-1);
-            var average = runSum/points;
-            var sigma = Math.sqrt(variance);
-            var high = average + (2*sigma);
-            var low = average - (2*sigma);
-            if (key2 === "2105" && points > 15 && (hash[key2] > high)) { //looks for rapid changes indicative of leaks
-               if (owner !== undefined) {
-                console.log("out of bounds" + key2 + ", average:" + hash[key2] + "high" + high + " low:" + low);
-                var Notification = Parse.Object.extend("Notification");
-                var notificationToSave = new Notification();
-                var notificationContent = "key:" + key2 + " value:" + hash[key2] + " high:" + high + " low:" + low + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
-                var notificationTitle =  "Coolant Temp Alert!";
-                notificationToSave.set("content", notificationContent);
-                notificationToSave.set("scanId", request.object.get("scannerId"));
-                notificationToSave.set("title", notificationTitle);
-                // notificationToSave.set("toId", owner); dont notify on prod
-                notificationToSave.save(null, {
-                  success: function(notificationToSave){
-                    //saved
-                  },
-                  error: function(notificationToSave, error){
-                    console.error("Error: " + error.code + " " + error.message);
-                  }
-                });
-              } else {
-                console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
-              }
-            }
-            
-            if (key2 === "2106" && points > 15 && ((Math.abs(average) > 1.5 && sigma > 5.0) || (sigma > 6.0))) { //accounts for shift of peak
-              if (owner !== undefined) {
-                console.log("out of bounds" + key2 + ", average:" + hash[key2] + " mean:" + average + " sigma:" + sigma);
-                var Notification = Parse.Object.extend("Notification");
-                var notificationToSave = new Notification();
-                var notificationContent = "key:" + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
-                var notificationTitle =  "algorithm alert!";
-                notificationToSave.set("content", notificationContent);
-                notificationToSave.set("scanId", request.object.get("scannerId"));
-                notificationToSave.set("title", notificationTitle);
-                // notificationToSave.set("toId", owner); dont send notifications on production
-                notificationToSave.save(null, {
-                  success: function(notificationToSave){
-                    //saved
-                  },
-                  error: function(notificationToSave, error){
-                    console.error("Error: " + error.code + " " + error.message);
-                  }
-                });
-              } else {
-                console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
-              }
-            }
-
-            scannerValues["runningSum"+key2] = runSum;
-            scannerValues["points"+key2] = points;
-            scannerValues["tVarRunningSum"+key2] = tRunSum;
+            runSum = hash[key2];
           }
+
+          // increase the number of points (runningsum/points = average)
+          if (("points"+key2) in scannerValues) {
+            points = scannerValues["points"+key2] + 1;
+          } else {
+            points = 1;
+          }
+
+          // same thing as running sum
+          if (("tVarRunningSum"+key2) in scannerValues) {
+            var tvar = Math.pow(hash[key2] - (runSum/points), 2);
+            tRunSum = scannerValues["tVarRunningSum"+key2] + tvar;
+          } else {
+            tRunSum = 0;
+          }
+
+          var variance = tRunSum / (points-1);
+          var average = runSum/points;
+          var sigma = Math.sqrt(variance);
+          var high = average + (2*sigma);
+          var low = average - (2*sigma);
+
+          // remove key2===2105 to apply this to all keys,along with the part above
+          //send a notification alert if this triggers the conditions
+          if (key2 === "2105" && points > 15 && (hash[key2] > high)) { //looks for rapid changes indicative of leaks
+             if (owner !== undefined) {
+              console.log("out of bounds" + key2 + ", average:" + hash[key2] + "high" + high + " low:" + low);
+              var Notification = Parse.Object.extend("Notification");
+              var notificationToSave = new Notification();
+              var notificationContent = "key:" + key2 + " value:" + hash[key2] + " high:" + high + " low:" + low + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
+              var notificationTitle =  "Coolant Temp Alert!";
+              notificationToSave.set("content", notificationContent);
+              notificationToSave.set("scanId", request.object.get("scannerId"));
+              notificationToSave.set("title", notificationTitle);
+              // notificationToSave.set("toId", owner); dont notify on prod
+              notificationToSave.save(null, {
+                success: function(notificationToSave){
+                  //saved
+                },
+                error: function(notificationToSave, error){
+                  console.error("Error: " + error.code + " " + error.message);
+                }
+              });
+            } else {
+              console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
+            }
+          }
+
+          // same as above,  different formula        
+          if (key2 === "2106" && points > 15 && ((Math.abs(average) > 1.5 && sigma > 5.0) || (sigma > 6.0))) { //accounts for shift of peak
+            if (owner !== undefined) {
+              console.log("out of bounds" + key2 + ", average:" + hash[key2] + " mean:" + average + " sigma:" + sigma);
+              var Notification = Parse.Object.extend("Notification");
+              var notificationToSave = new Notification();
+              var notificationContent = "key:" + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
+              var notificationTitle =  "algorithm alert!";
+              notificationToSave.set("content", notificationContent);
+              notificationToSave.set("scanId", request.object.get("scannerId"));
+              notificationToSave.set("title", notificationTitle);
+              // notificationToSave.set("toId", owner); dont send notifications on production
+              notificationToSave.save(null, {
+                success: function(notificationToSave){
+                  //saved
+                },
+                error: function(notificationToSave, error){
+                  console.error("Error: " + error.code + " " + error.message);
+                }
+              });
+            } else {
+              console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
+            }
+          }
+
+          // set the scannervalues for this key to keep them saved for the future.
+          scannerValues["runningSum"+key2] = runSum;
+          scannerValues["points"+key2] = points;
+          scannerValues["tVarRunningSum"+key2] = tRunSum;
         }
       }
     }
+  }
 });
+
 
 Parse.Cloud.define("updateDtcs", function(request, response) {
   var scan = request.params;
@@ -692,10 +734,12 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
     }
   });
 
+  // we found the car related to the scan, now update its dtcs
   var foundCar = function (car) {
     // parse dtcs and create notification
     var dtcData = scan["DTCs"];
     console.log("dtcs");
+    // dtcs are saved as 'dtc1,dtc2,dtc3'
     var dtcs = dtcData.split(",");
     var dtclst = [];
     for (var i = 0; i < dtcs.length; i++){
@@ -704,13 +748,14 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
         // add if new
         if (car.get("storedDTCs").indexOf(dtcs[i]) === -1){
           car.addUnique("storedDTCs", dtcs[i]);
-          // this needs to be run each time... there are too many results for dtcs...
+          // this query needs to be run each time... there are too many results for dtcs...
           var query = new Parse.Query("DTC");
           query.equalTo("dtcCode", dtcs[i]);
           query.find({
             success: function (data) {
               if (data.length > 0) {
                 dtclst.push(data[0]);
+                //send a notification about the dtc
                 notify(data[0], car);
               }
             },
@@ -722,6 +767,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
       }
     }
 
+    // save the car, and then send an email about the dtc to the users dealership.
     car.save(null, {
       success: function (savedCar) {
         console.log("car saved"); // success for cloud function
@@ -763,6 +809,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
     });
   };
 
+  // send email about the dtc sent to the customer
   function sendEmail (user, car, shop, dtclst ) {
       var emailHtml = "<h2>Notification sent to customer</h2>";
       emailHtml += "<strong>DTC alert for:</strong> " + user.get("name");
@@ -799,7 +846,9 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
       var email = sendgrid.Email({to: [shop.get("email")]});
       email.setFrom(user.get("email"));
       email.setSubject("Notification sent to " + user.get("name"));
-      email.setSendAt(parseInt(new Date().toUTCString()) + 70*60*60); // 70 hour delay
+      // we need to delay the email by 70 hours to give them time to respond - shiva
+      // sendat is limited to 72 hours in the future i think.
+      email.setSendAt(parseInt(new Date().toUTCString()) + 70*60*60); // 60 seconds * 60 minutes * 70 hours = 70 hour delay
       email.setHTML(emailHtml);
 
       sendgrid.sendEmail(email, {
@@ -816,7 +865,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
       });
    }
 
-
+   // send notification about dtc to customer
   var notify = function(data, car) {
     var description = data.get("description");
     var dtc = data.get("dtcCode");
@@ -841,7 +890,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
   };
 });
 
-
+// if new user is created we send them a signup email
 Parse.Cloud.afterSave(Parse.User, function(request, response) {
   Parse.Cloud.useMasterKey();
   var user = request.object;
@@ -881,19 +930,21 @@ Parse.Cloud.afterSave(Parse.User, function(request, response) {
   }
 });
 
-
+// this is what sends notifications
 Parse.Cloud.afterSave("Notification", function(request) {
   //push notification
   var notification = request.object;
 
   var pushQuery = new Parse.Query(Parse.Installation);
 
+  // send the notification to the column 'toId'
   pushQuery.equalTo('userId', notification.get("toId"));
 
   Parse.Push.send({
     where: pushQuery,
     badge: "Increment",
     data:{
+        // you can add more variables here
         alert: notification.get("content"), //to enable ios push
         title: notification.get("title")
       }
@@ -904,44 +955,9 @@ Parse.Cloud.afterSave("Notification", function(request) {
       console.error("Error: "+ error.code + " : " + error.message);
     }
   });
-
-    /*
-    var userQuery = new Parse.Query(Parse.User);
-
-    userQuery.equalTo('objectId', notification.get("toId"));
-    userQuery.find({
-        success: function(userData){
-            //send notification email to users
-
-            var email = userData[0]["email"];
-            var name = userData[0]["name"];
-
-
-            var sendgrid = require("sendgrid");
-            sendgrid.initialize("ansik", "Ansik.23");
-
-            sendgrid.sendEmail({
-                to: [email],
-                from: "yashin@ansik.ca",
-                subject: notification.get("title"),
-                text: notification.get("content"),
-                replyto: "yashin@ansik.ca"
-            }).then(function(httpResponse) {
-                console.log(httpResponse);
-                response.success("Email sent");
-            },function(httpResponse) {
-                console.error(httpResponse);
-                response.error("error");
-            });
-
-        },
-        error: function(error){
-            console.error("Could not find user with objectId", notification.get("toId"));
-            console.error("ERROR: ", error);
-        }
-      });*/
 });
 
+// we query edmunds then run this function that parses what it sent back and adds rows to the edmundsservice table
 Parse.Cloud.define("addEdmundsServices", function(request, status) {
     var serviceList = request.params.serviceList;
     var createEdmundsService = function(service, carObject) {
@@ -953,6 +969,9 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
       // setting priority based on what we put in the service table.
       if (service["frequency"] === 3 || service["frequency"] === 4) {
         for(var i = 0; i < serviceList.length; i++) {
+          // when we find the matching one we stop
+          // we dont query specifically for this because in that case you would have a new query for each service
+          // this way we only query once for all of them
           if((service["item"] === serviceList[i][0]) &&
              (service["action"] === serviceList[i][1])) {
             eService.set('priority', serviceList[i][2]);
@@ -984,13 +1003,16 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
     };
     var services = [];
 
+    // create the edmundsservices for each of the ones in the array we are given
     for (var i = 0; i < request.params.edmundServices.length; i++) {
         if(request.params.edmundServices[i]["intervalMileage"] === 0){
           continue;
         }
+        // save each result in the services array
         services.push(createEdmundsService(request.params.edmundServices[i], request.params.carObject) );
     }
 
+    // save them all at once.
     Parse.Object.saveAll(services, {
         success: function (data) {
             console.log("service saved");
