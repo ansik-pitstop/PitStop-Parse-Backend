@@ -484,6 +484,181 @@ Parse.Cloud.afterSave("Scan", function(request) {
       }
     });
   }
+
+    // real time processing
+  if (!request.object.existed()) {
+    var scannerValues = {};
+    var scanner;
+    var owner = undefined;
+    var car;
+    var carQuery = new Parse.Query("Car");
+    carQuery.equalTo("scannerId", request.object.get("scannerId"));
+    carQuery.first({
+        success: function(data){
+              if (data){
+                car = data;
+                owner = car.get("owner");
+              } else {
+                return; // no owner?
+              }
+          },
+          error: function(error){
+              console.error(error);
+          }
+    }).then(function() {
+      var query = new Parse.Query("Scanner");
+      query.equalTo("scannerId", request.object.get("scannerId"));
+      query.first({
+          success: function(data){
+                if (data){
+                  scanner = data;
+                  var jsonData = data.toJSON();
+                  for(var key in jsonData) {
+                    if (key == "scannerId" || key == "objectId" || key == "updatedAt" || key == "createdAt") {
+                      continue;
+                    }
+                    // column name to row value
+                    // the column names are variable so we have to do this (aka what pids... 30? 20?)
+                    scannerValues[key] = data.get(key);
+                  }
+                } else {
+                  scanner = new Parse.Object("Scanner");
+                  scanner.set("scannerId", request.object.get("scannerId"));
+                }
+            },
+            error: function(error){
+                console.error(error);
+            }
+      }).then(function() {
+        var PIDArray = request.object.get("PIDArray");
+        if (PIDArray) {
+          for(var i = 0; i < PIDArray.length; i++) {
+            pids = PIDArray[i]['pids'];
+            if (pids){
+              processPids(pids, PIDArray[i]["rtcTime"], owner);
+            }
+          }
+
+          // update scanner to new values
+          for(var key in scannerValues) {
+            scanner.set(key, scannerValues[key]);
+          }
+          scanner.save(null, {
+            success: function (saved) {
+            },
+            error: function (saveError) {
+              console.log("not saved");
+              console.error(saveError);
+            }
+          });
+        }
+      }, function(error) {
+        alert("Error: " + error.code + " " + error.message);
+      });
+    }, function(error) {
+      alert("Error: " + error.code + " " + error.message);
+    });
+  }
+
+  function processPids (pids, timestamp, owner) {
+      var hash = {};
+      for(var j = 0; j < pids.length; j++){
+        var id = pids[j]['id'];
+        var data = pids[j]['data'];
+        if (data !== undefined && id) {
+          hash[id] = data;
+        }
+      }
+
+      if ("210D" in hash && "210C" in hash &&
+          (hash["210D"] === 0 && hash["210C"] === 0)) {
+        // reset all values in scannerValues to 0
+        for (var key in scannerValues) {
+          scannerValues[key] = 0;
+        }
+      } else {
+        for (var key2 in hash) {
+          if (!(key2 === "2106" || key2 === "2105") || //only on 2106 for now.
+          key2 === "210D" || key2 === "210C") { // no need to track speed/rpm
+            continue;
+          } else {
+            var runSum,tRunSum,points;
+            if (("runningSum"+key2) in scannerValues) {
+              runSum = scannerValues["runningSum"+key2] + hash[key2];
+            } else {
+              runSum = hash[key2];
+            }
+            if (("points"+key2) in scannerValues) {
+              points = scannerValues["points"+key2] + 1;
+            } else {
+              points = 1;
+            }
+            if (("tVarRunningSum"+key2) in scannerValues) {
+              var tvar = Math.pow(hash[key2] - (runSum/points), 2);
+              tRunSum = scannerValues["tVarRunningSum"+key2] + tvar;
+            } else {
+              tRunSum = 0;
+            }
+            var variance = tRunSum / (points-1);
+            var average = runSum/points;
+            var sigma = Math.sqrt(variance);
+            var high = average + (2*sigma);
+            var low = average - (2*sigma);
+            if (key2 === "2105" && points > 15 && (hash[key2] > high)) { //looks for rapid changes indicative of leaks
+               if (owner !== undefined) {
+                console.log("out of bounds" + key2 + ", average:" + hash[key2] + "high" + high + " low:" + low);
+                var Notification = Parse.Object.extend("Notification");
+                var notificationToSave = new Notification();
+                var notificationContent = "key:" + key2 + " value:" + hash[key2] + " high:" + high + " low:" + low + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
+                var notificationTitle =  "Coolant Temp Alert!";
+                notificationToSave.set("content", notificationContent);
+                notificationToSave.set("scanId", request.object.get("scannerId"));
+                notificationToSave.set("title", notificationTitle);
+                // notificationToSave.set("toId", owner); dont notify on prod
+                notificationToSave.save(null, {
+                  success: function(notificationToSave){
+                    //saved
+                  },
+                  error: function(notificationToSave, error){
+                    console.error("Error: " + error.code + " " + error.message);
+                  }
+                });
+              } else {
+                console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
+              }
+            }
+            
+            if (key2 === "2106" && points > 15 && ((Math.abs(average) > 1.5 && sigma > 5.0) || (sigma > 6.0))) { //accounts for shift of peak
+              if (owner !== undefined) {
+                console.log("out of bounds" + key2 + ", average:" + hash[key2] + " mean:" + average + " sigma:" + sigma);
+                var Notification = Parse.Object.extend("Notification");
+                var notificationToSave = new Notification();
+                var notificationContent = "key:" + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
+                var notificationTitle =  "algorithm alert!";
+                notificationToSave.set("content", notificationContent);
+                notificationToSave.set("scanId", request.object.get("scannerId"));
+                notificationToSave.set("title", notificationTitle);
+                // notificationToSave.set("toId", owner); dont send notifications on production
+                notificationToSave.save(null, {
+                  success: function(notificationToSave){
+                    //saved
+                  },
+                  error: function(notificationToSave, error){
+                    console.error("Error: " + error.code + " " + error.message);
+                  }
+                });
+              } else {
+                console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. "+ key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma  + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
+              }
+            }
+
+            scannerValues["runningSum"+key2] = runSum;
+            scannerValues["points"+key2] = points;
+            scannerValues["tVarRunningSum"+key2] = tRunSum;
+          }
+        }
+      }
+    }
 });
 
 Parse.Cloud.define("updateDtcs", function(request, response) {
