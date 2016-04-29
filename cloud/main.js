@@ -1508,9 +1508,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
       }
       // see if we are setting new values
-      if((car.get("pendingEdmundServices") === servicesDue) &&
-        (car.get("pendingIntervalServices") === []) &&
-        (car.get("pendingFixedServices") === [])){
+      if(car.get("pendingEdmundServices").sort().toString() === servicesDue.sort().toString()){
         changed = false;
       } else {
         car.set("pendingEdmundServices", servicesDue);
@@ -1520,9 +1518,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
       }
     } else { // edmunds isnt used
       // see if we are setting new values
-      if((car.get("pendingEdmundServices") === []) &&
-        (car.get("pendingIntervalServices") === pendingInterval) &&
-        (car.get("pendingFixedServices") === pendingFixed)){
+      if((car.get("pendingIntervalServices").sort().toString() === pendingInterval.sort().toString()) &&
+        (car.get("pendingFixedServices").sort().toString() === pendingFixed.sort().toString())){
         changed = false;
       } else {
         car.set("pendingEdmundServices", []);
