@@ -383,7 +383,7 @@ Parse.Cloud.afterSave("Car", function(request) {
             "car": car.id
         });
 
-        // totalmileage should never be undefined
+        // totalMileage should never be undefined
         var mileage = car.get("totalMileage");
         if (mileage === undefined || mileage === 0) {
             mileage = car.get("baseMileage");
@@ -1158,27 +1158,28 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             // if we have a dealership we do the dealerships services, otherwise we use edmunds
             if (car.get("dealership")) {
                 // DEALER FIXED SERVICES
-                var fixed = new Parse.Query("ServiceFixed");
-                // filter for same dealership and mileage less than current total
-                fixed.equalTo("dealership", car.get("dealership"));
-                fixed.each(function(service) {
-                    dealerServices = true;
-                    // get the history for this particular service
-                    var history = false;
-                    for (var z = 0; z < fixedHistory.length; z++) {
-                        if (fixedHistory[z][0] === service.id) {
-                            history = true;
-                        }
-                    }
-
-                    // if no history and within the interval(minus 500) than add it to pendingFixed
-                    if (!history) {
-                        if (carMileage > service.get("mileage") - 500) {
-                            pendingFixed.push(service.id);
-                            fixedDesc.push([service.get("item"), service.get("action")]);
-                        }
-                    }
-                });
+                // NOTE: fix service is not supported
+                // var fixed = new Parse.Query("ServiceFixed");
+                // // filter for same dealership and mileage less than current total
+                // fixed.equalTo("dealership", car.get("dealership"));
+                // fixed.each(function(service) {
+                //     dealerServices = true;
+                //     // get the history for this particular service
+                //     var history = false;
+                //     for (var z = 0; z < fixedHistory.length; z++) {
+                //         if (fixedHistory[z][0] === service.id) {
+                //             history = true;
+                //         }
+                //     }
+                //
+                //     // if no history and within the interval(minus 500) than add it to pendingFixed
+                //     if (!history) {
+                //         if (carMileage > service.get("mileage") - 500) {
+                //             pendingFixed.push(service.id);
+                //             fixedDesc.push([service.get("item"), service.get("action")]);
+                //         }
+                //     }
+                // });
 
                 // DEALER INTERVAL BASED SERVICE
                 var intervals = new Parse.Query("ServiceInterval");
@@ -1186,7 +1187,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                 intervals.equalTo("dealership", car.get("dealership"));
                 intervals.each(function(service) {
                     dealerServices = true;
-                    var intMileage = service.get("mileage");
+                    var intervalMileage = service.get("mileage");
                     // get the history for this particular service
                     // find the mileage of the last time it was done
                     var history = false;
@@ -1201,20 +1202,21 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                     }
 
                     // if no history and within the interval(minus 500) than add it to pendingFixed
-                    if (!history) {
-                        if (carMileage > intMileage - 500) {
-                            pendingInterval.push(service.id);
-                            intervalDesc.push([service.get("item"), service.get("action")]);
-                        }
-                        // if history, check interval(minus 500) based on the last time it was done,
-                    } else {
-                        console.log(historyMileage + "HISTORY MILEAGE");
-                        var currentIntervalMileage = carMileage - historyMileage;
-                        if (currentIntervalMileage - intMileage > -500) {
-                            pendingInterval.push(service.id);
-                            intervalDesc.push([service.get("item"), service.get("action")]);
-                        }
+                    // if history service exists, estimatedServiceMileage should be history mileage + interval mileage
+                    var estimatedServiceMileage = 0;
+                    if (history) {
+                        estimatedServiceMileage = historyMileage + intervalMileage;
                     }
+                    else {
+                        // get the next interval service mileage
+                        estimatedServiceMileage = Math.ceil(totalMileage / intervalMileage) * intervalMileage;
+                    }
+
+                    if (Math.abs(totalMileage - estimatedServiceMileage) <= 500) {
+                        pendingInterval.push(service.id);
+                        intervalDesc.push([service.get("item"), service.get("action")]);
+                    }
+
                 }).then(function() {
                     // if no dealership, show edmunds services
                     // XXX there should be a better way to do this: a boolean in shop table?
@@ -1340,12 +1342,14 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             var engineEdm = edmundsServices[i].get("engineCode");
             var freq = edmundsServices[i].get("frequency");
             var id = edmundsServices[i].id;
-            var intMileage = edmundsServices[i].get("intervalMileage");
+            var intervalMileage = edmundsServices[i].get("intervalMileage");
             var item = edmundsServices[i].get("item");
             var action = edmundsServices[i].get("action");
             var priority = edmundsServices[i].get("priority");
             var ignore = true;
             var engineCar = ["  ", "    "];
+            var isFixed = false;
+            var isValidService = false;
 
             if (car.get("engine") !== undefined) {
                 engineCar = car.get("engine").split(" ");
@@ -1361,7 +1365,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             }
 
             // dont allow mileage = 0
-            if (intMileage === 0) {
+            if (intervalMileage === 0) {
                 continue;
             }
 
@@ -1397,26 +1401,38 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                if there isnt history we show it if it passed the interval(minus 500)
                the .4 is to only show services on a new car that are recent
                EX: so if you put in your car at 100K, we dont show services that should have been done from 0-60k */
-            if (freq === 3 && !history) {
-                if ((carMileage * 0.4) > (carMileage - intMileage) && (carMileage - intMileage) > -500) {
-                    save = true;
-                }
-                // frequency 4 means the service is done repeatedly at intervals of the specified intervalMileage
-                // no history means we show it if within 500
-                // history means we show it based on the last time it was done
-            } else if (freq === 4 && !history) {
-                if (carMileage > intMileage - 500) {
-                    save = true;
-                }
-            } else if (freq === 4 && history) {
-                var currentIntervalMileage = carMileage - historyMileage;
-                if (currentIntervalMileage - intMileage > -500) {
-                    save = true;
-                }
+
+            // edmunds documents
+            // http://developer.edmunds.com/api-documentation/vehicle/service_maintenance/v1/
+
+            if (freq === 3) {
+                isFixed = true;
+                isValidService = true;
+            }
+            else if (freq === 4) {
+                isValidService = true;
             }
 
-            if (save) {
-                serviceStack.push(edmundsServices[i]);
+            var estimatedServiceMileage = 0;
+
+            if (history) {
+                estimatedServiceMileage = historyMileage + intervalMileage;
+            }
+            else {
+                // get the next interval service mileage
+                estimatedServiceMileage = Math.ceil(totalMileage / intervalMileage) * intervalMileage;
+            }
+
+            if (isFixed) {
+                // handles services with fixed mileage
+                // no logic for now
+                continue;
+            }
+            else {
+                // handles services with interval mileage
+                if (Math.abs(totalMileage - estimatedServiceMileage) <= 500) {
+                    serviceStack.push(edmundsServices[i]);
+                }
             }
         }
         carSave(true);
