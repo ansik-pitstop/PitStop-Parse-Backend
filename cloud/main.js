@@ -3,6 +3,8 @@ var recallMasters = require("cloud/recallMasters.js");
 var sendgrid = require("cloud/sendgrid_personal.js");
 sendgrid.initialize("ansik", "Ansik.23");
 
+var u = require('underscore');
+
 /*
  Constants + Config
  */
@@ -65,31 +67,44 @@ Parse.Cloud.beforeSave("Scan", function(request, response) {
                         // see specs for more info on these conversion functions
                         if (id === "2105" || id === "210F") {
                             data = data - 40.0;
-                        } else if (id === "210C") {
+                        }
+                        else if (id === "210C") {
                             data = ((x2 * 256.0) + x1) / 4.0;
-                        } else if (id === "2110") {
+                        }
+                        else if (id === "2110") {
                             data = ((x2 * 256.0) + x1) * 0.01;
-                        } else if (id === "210E") {
+                        }
+                        else if (id === "210E") {
                             data = (data * 127.0 / 255.0) - 64.0;
-                        } else if (id === "2104" || id === "2111") {
+                        }
+                        else if (id === "2104" || id === "2111") {
                             data = data * 100.0 / 255.0;
-                        } else if (id === "210A") {
+                        }
+                        else if (id === "210A") {
                             data = data * 3.0;
-                        } else if (id === "2114" || id === "2115" || id === "2116" || id === "2117" || id === "2118" || id === "2119" || id === "211A" || id === "211B") {
+                        }
+                        else if (id === "2114" || id === "2115" || id === "2116" || id === "2117" || id === "2118" || id === "2119" || id === "211A" || id === "211B") {
                             data = data * 1.275 / 255.0;
-                        } else if (id === "2106" || id === "2150" || id === "2151" || id === "2107" || id === "2108" || id === "2109") {
+                        }
+                        else if (id === "2106" || id === "2150" || id === "2151" || id === "2107" || id === "2108" || id === "2109") {
                             data = (data - 128.0) * 100.0 / 128.0;
-                        } else if (id === "211F" || id === "2121") {
+                        }
+                        else if (id === "211F" || id === "2121") {
                             data = (x2 * 256.0) + x1;
-                        } else if (id === "2122") {
+                        }
+                        else if (id === "2122") {
                             data = ((x2 * 256.0) + x1) * 0.079;
-                        } else if (id === "2123") {
+                        }
+                        else if (id === "2123") {
                             data = ((x2 * 256.0) + x1) * 10.0;
-                        } else if (id === "2152" || id === "2153" || id === "2154" || id === "2155") {
+                        }
+                        else if (id === "2152" || id === "2153" || id === "2154" || id === "2155") {
                             data = ((x2 * 256.0) + x1) * 7.995 / 65535.0;
-                        } else if (id === "2124" || id === "2125" || id === "2126" || id === "2127" || id === "2128" || id === "2129" || id === "212A" || id === "212B") {
+                        }
+                        else if (id === "2124" || id === "2125" || id === "2126" || id === "2127" || id === "2128" || id === "2129" || id === "212A" || id === "212B") {
                             data = ((x2 * 256.0) + x1) * 1.999 / 65535.0;
-                        } else if (id === "2101") {
+                        }
+                        else if (id === "2101") {
                             data = data % 128;
                         }
                         // save new pid
@@ -108,7 +123,8 @@ Parse.Cloud.beforeSave("Scan", function(request, response) {
     // scannerid is required (otherwise the scan is useless)
     if (!request.object.get('scannerId')) {
         response.error("Scannerid undefined");
-    } else {
+    }
+    else {
         var carQuery = new Parse.Query("Car");
         carQuery.equalTo("scannerId", request.object.get("scannerId"));
         // only worry about one.. if there are multiple its not our job to fix it
@@ -137,7 +153,8 @@ Parse.Cloud.beforeSave("EdmundsRecall", function(request, response) {
             if (data !== undefined) {
                 //checks if there is existing object in table with service
                 response.error("An EdmundsRecall with this edmundsId already exists.");
-            } else {
+            }
+            else {
                 //if there is not existing object with edmundsId, continue with save
                 response.success();
             }
@@ -155,7 +172,8 @@ Parse.Cloud.beforeSave("TripMileage", function(request, response) {
     if (trip.isNew()) {
         if (trip.get("mileage") <= 0) {
             response.error("mileage must be positive");
-        } else {
+        }
+        else {
             // dont save multiple trips
             var query = new Parse.Query("TripMileage");
             query.equalTo("tripId", trip.get("tripId"));
@@ -165,7 +183,8 @@ Parse.Cloud.beforeSave("TripMileage", function(request, response) {
                 success: function(data) {
                     if (data) {
                         response.error("Duplicate trip");
-                    } else {
+                    }
+                    else {
                         response.success();
                     }
                 },
@@ -219,11 +238,13 @@ Parse.Cloud.afterSave("TripMileage", function(request, response) {
 
                                     // this fixes precision issues
                                     car.set("totalMileage", Math.round(newMileage * 100) / 100);
-                                } else {
+                                }
+                                else {
                                     // maxmileage is greater or equal to this trip, so do nothing
                                     return;
                                 }
-                            } else {
+                            }
+                            else {
                                 // unique tripId, so increase by trip mileage
                                 newMileage += trip.get("mileage");
                                 // fix precision issues
@@ -248,7 +269,8 @@ Parse.Cloud.afterSave("TripMileage", function(request, response) {
                             console.log("tripmileage query error" + error);
                         }
                     });
-                } else {
+                }
+                else {
                     console.log("car with scannerId " + trip.get("scannerId") + " didnt exist for trip " + trip.id);
                 }
             },
@@ -283,16 +305,19 @@ Parse.Cloud.beforeSave("Car", function(request, response) {
         // check vin is unique
         if (!car.get("VIN")) {
             response.error('vin must exist');
-        } else if (car.get("VIN").length !== 17) {
+        }
+        else if (car.get("VIN").length !== 17) {
             response.error('vin must be 17 chars');
-        } else {
+        }
+        else {
             var query = new Parse.Query("Car");
             query.equalTo("VIN", request.object.get("VIN"));
             query.first({
                 success: function(object) {
                     if (object && object.id !== request.object.id) {
                         response.error("VIN already exists");
-                    } else {
+                    }
+                    else {
                         response.success();
                     }
                 },
@@ -301,7 +326,8 @@ Parse.Cloud.beforeSave("Car", function(request, response) {
                 }
             });
         }
-    } else { // car already existed
+    }
+    else { // car already existed
         // temporary for main branch, to fix old cars before the default above values were set
         if (!car.get("pendingIntervalServices")) {
             car.set("pendingIntervalServices", []);
@@ -498,7 +524,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                 if (data) {
                     car = data;
                     owner = car.get("owner");
-                } else {
+                }
+                else {
                     return; // no owner?
                 }
             },
@@ -524,7 +551,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                             // store all other columns in dictionaries.. we dont know what they are so this is done dynamically
                             scannerValues[key] = data.get(key);
                         }
-                    } else {
+                    }
+                    else {
                         // create a new one scanner if it doesnt exist yet.
                         scanner = new Parse.Object("Scanner");
                         scanner.set("scannerId", request.object.get("scannerId"));
@@ -586,7 +614,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                 // the running values restart everytime you start the car
                 scannerValues[key] = 0;
             }
-        } else {
+        }
+        else {
             // we are still driving, so update the old scannerValues
             for (var key2 in hash) {
                 // shyam only wants to track 2106 and 2105 right now, remove that and it will track them all
@@ -594,7 +623,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                 if (!(key2 === "2106" || key2 === "2105") ||
                     key2 === "210D" || key2 === "210C") { // no need to track speed/rpm
                     continue;
-                } else {
+                }
+                else {
                     // these are algorithms written by other people, again, talk to shyam if you want to understand it.
                     var runSum, tRunSum, points;
 
@@ -602,14 +632,16 @@ Parse.Cloud.afterSave("Scan", function(request) {
                     // if it already exists we will add the current value to this 'running sum'
                     if (("runningSum" + key2) in scannerValues) {
                         runSum = scannerValues["runningSum" + key2] + hash[key2];
-                    } else {
+                    }
+                    else {
                         runSum = hash[key2];
                     }
 
                     // increase the number of points (runningsum/points = average)
                     if (("points" + key2) in scannerValues) {
                         points = scannerValues["points" + key2] + 1;
-                    } else {
+                    }
+                    else {
                         points = 1;
                     }
 
@@ -617,7 +649,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                     if (("tVarRunningSum" + key2) in scannerValues) {
                         var tvar = Math.pow(hash[key2] - (runSum / points), 2);
                         tRunSum = scannerValues["tVarRunningSum" + key2] + tvar;
-                    } else {
+                    }
+                    else {
                         tRunSum = 0;
                     }
 
@@ -648,7 +681,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                                     console.error("Error: " + error.code + " " + error.message);
                                 }
                             });
-                        } else {
+                        }
+                        else {
                             console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. " + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
                         }
                     }
@@ -673,7 +707,8 @@ Parse.Cloud.afterSave("Scan", function(request) {
                                     console.error("Error: " + error.code + " " + error.message);
                                 }
                             });
-                        } else {
+                        }
+                        else {
                             console.log("out of bounds, scannerId " + request.object.get("scannerId") + " not linked to car. " + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id);
                         }
                     }
@@ -701,9 +736,11 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
     // which sometimes isnt filled, or unique.
     if (carVin === undefined && scannerId === undefined) {
         response.error("No vin or scannerid provided");
-    } else if (carVin === undefined) {
+    }
+    else if (carVin === undefined) {
         query.equalTo("scannerId", scannerId);
-    } else {
+    }
+    else {
         query.equalTo("VIN", carVin);
     }
 
@@ -711,7 +748,8 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
         success: function(car) {
             if (car) {
                 foundCar(car);
-            } else {
+            }
+            else {
                 response.error("No results for car with VIN: " + carVin + " or scan id " + scannerId);
             }
         },
@@ -787,7 +825,8 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
                         response.error();
                     }
                 });
-            } else {
+            }
+            else {
                 response.success();
             }
         }, function(error) {
@@ -1064,7 +1103,7 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     // Initializing variables
     var car = null;
     var carMakeModelYearId = null;
-    var carMileage = 0;
+    var totalMileage = 0;
     var serviceStack = [];
     var newServices = false;
     var pendingFixed = [];
@@ -1086,9 +1125,11 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     // which sometimes isnt filled, or unique.
     if (carVin === undefined && scannerId === undefined) {
         response.error("No vin or scannerid provided");
-    } else if (carVin === undefined) {
+    }
+    else if (carVin === undefined) {
         query.equalTo("scannerId", scannerId);
-    } else {
+    }
+    else {
         query.equalTo("VIN", carVin);
     }
 
@@ -1096,7 +1137,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         success: function(cars) {
             if (cars.length > 0) {
                 foundCar(cars[0]);
-            } else {
+            }
+            else {
                 response.error("No results for car with VIN: " + scan['carVin']);
             }
         },
@@ -1113,6 +1155,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     var foundCar = function(loadedCar) {
         // assigning the loadedCar to global car
         car = loadedCar;
+        pendingInterval = car.get("pendingIntervalServices");
+        console.log("checking services for car " + car.get("VIN"));
+        console.log("# of pending interval services: " + pendingInterval.length);
 
         // we pass mileage with the scan object
         var scanMileage = scan["mileage"];
@@ -1122,16 +1167,18 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
 
         // setting the car mileage
         if (scanMileage !== 0) {
-            carMileage = scanMileage;
-        } else {
+            totalMileage = scanMileage;
+        }
+        else {
             if (car.get("totalMileage") === undefined ||
                 car.get("totalMileage") === 0) {
-                carMileage = car.get("baseMileage");
-            } else {
-                carMileage = car.get("totalMileage");
+                totalMileage = car.get("baseMileage");
+            }
+            else {
+                totalMileage = car.get("totalMileage");
             }
         }
-        car.set("totalMileage", carMileage);
+        car.set("totalMileage", totalMileage);
 
         // i dont think anyone knows why this is done
         if (scan["freezeData"] !== undefined) { //exists
@@ -1147,37 +1194,49 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             var type = history.get("type");
             var objID = history.get("serviceObjectId");
             var mileage = history.get("mileage");
+
+            // check whether current service exists in pending services
             if (type === 0) { // edmunds
                 edmundsHistory.push([objID, mileage]);
-            } else if (type === 1) { // fixed
+            }
+            else if (type === 1) { // fixed
                 fixedHistory.push([objID, mileage]);
-            } else if (type === 2) { // interval
+            }
+            else if (type === 2) { // interval
                 intervalHistory.push([objID, mileage]);
             }
         }).then(function() {
             // if we have a dealership we do the dealerships services, otherwise we use edmunds
             if (car.get("dealership")) {
                 // DEALER FIXED SERVICES
-                // NOTE: fix service is not supported
+                // NOTE: fixed sericve not supported
                 // var fixed = new Parse.Query("ServiceFixed");
                 // // filter for same dealership and mileage less than current total
                 // fixed.equalTo("dealership", car.get("dealership"));
                 // fixed.each(function(service) {
                 //     dealerServices = true;
                 //     // get the history for this particular service
+                //     var saveService = false;
                 //     var history = false;
                 //     for (var z = 0; z < fixedHistory.length; z++) {
                 //         if (fixedHistory[z][0] === service.id) {
                 //             history = true;
                 //         }
                 //     }
-                //
                 //     // if no history and within the interval(minus 500) than add it to pendingFixed
                 //     if (!history) {
-                //         if (carMileage > service.get("mileage") - 500) {
-                //             pendingFixed.push(service.id);
-                //             fixedDesc.push([service.get("item"), service.get("action")]);
+                //         var intervalMileage = service.get("mileage");
+                //         var serviceMileage = totalMileage % intervalMileage;
+                //         if ((totalMileage >= intervalMileage - 500) && (serviceMileage <= 500 || Math.abs(intervalMileage - serviceMileage) <= 500)) {
+                //
                 //         }
+                //     } {
+                //
+                //     }
+                //
+                //     if (saveService) {
+                //         pendingFixed.push(service.id);
+                //         fixedDesc.push([service.get("item"), service.get("action")]);
                 //     }
                 // });
 
@@ -1186,8 +1245,15 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                 // filter for same dealership and mileage less than current total
                 intervals.equalTo("dealership", car.get("dealership"));
                 intervals.each(function(service) {
+                    if (u.some(pendingInterval, function(objectId) {
+                        return objectId === service.id;
+                    })) {
+                        console.log("service " + service.id + " is already in pending service, skipping")
+                        return; // dont update existing service
+                    }
+
+                    var saveService = false;
                     dealerServices = true;
-                    var intervalMileage = service.get("mileage");
                     // get the history for this particular service
                     // find the mileage of the last time it was done
                     var history = false;
@@ -1201,38 +1267,72 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                         }
                     }
 
+                    var totalMileage = car.get("totalMileage");
+                    var intervalMileage = service.get("mileage");
+                    var nextServiceMileage = 0;
+                    var multiplier = 0;
+
                     // if no history and within the interval(minus 500) than add it to pendingFixed
-                    // if history service exists, estimatedServiceMileage should be history mileage + interval mileage
-                    var estimatedServiceMileage = 0;
+                    // NOTE: historyMileage is 0 if no history found
+
                     if (history) {
-                        estimatedServiceMileage = historyMileage + intervalMileage;
+                        multiplier = 1;
                     }
                     else {
-                        // get the next interval service mileage
-                        estimatedServiceMileage = Math.ceil(totalMileage / intervalMileage) * intervalMileage;
+                        if (totalMileage > 1) {
+                            //multiplier indicates what interval of mileage the next service is in
+                            multiplier = Math.round(totalMileage / (intervalMileage - 500 / 2));
+                        }
+                        else {
+                            multiplier = 1;
+                        }
                     }
 
-                    if (Math.abs(totalMileage - estimatedServiceMileage) <= 500) {
+                    multiplier = Math.max(multiplier, 1);
+
+                    nextServiceMileage = intervalMileage * multiplier + historyMileage;
+
+                    if (totalMileage >=  nextServiceMileage - 500) {
+                        // save service if total milage is greater than of nextServiceMileage - 500
+                        saveService = true;
+                    }
+                    else {
+                        saveService = false;
+                    }
+
+                    // console.log("history service found: " + history + ", history mileage: " + historyMileage);
+                    // console.log("current mileage: " + totalMileage);
+                    // console.log("intervalMileage: " + intervalMileage);
+                    // console.log("multiplier: " + multiplier);
+                    // console.log("nextServiceMileage: " + nextServiceMileage);
+                    // console.log("save service: " + saveService);
+                    // console.log("");
+
+                    if (saveService) {
+                        console.log("saving service: " + service.id);
                         pendingInterval.push(service.id);
                         intervalDesc.push([service.get("item"), service.get("action")]);
                     }
 
                 }).then(function() {
+                    console.log("dealerServices: " + dealerServices);
                     // if no dealership, show edmunds services
                     // XXX there should be a better way to do this: a boolean in shop table?
                     if (!dealerServices) { // car has no dealership or dealership has no services
-                        console.log("dealership but no dealer services");
-                        readEdmundsServices();
-                    } else {
-                        console.log("dealership and dealer services");
+                        console.log("no dealearship specific service found. checking edmunds services");
+                        updateEdmundServices();
+                    }
+                    else {
+                        console.log("dealership specific services found.");
                         carSave(false);
                     }
                 }, function(error) {
                     alert("Error: " + error.code + " " + error.message);
                 });
-            } else {
-                console.log("no dealership, edmunds");
-                readEdmundsServices();
+            }
+            else {
+                console.log("no dealearship specific service found. checking edmunds services");
+                updateEdmundServices();
             }
         }, function(error) {
             alert("Error: " + error.code + " " + error.message);
@@ -1240,7 +1340,8 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     };
 
     // no dealership or dealership services, so use edmijds
-    var readEdmundsServices = function() {
+    var updateEdmundServices = function() {
+        console.log("getting edmunds services and valid service list");
         // query for the Edmunds Services associated with this Car
         var edmundsQuery = new Parse.Query("EdmundsService");
         edmundsQuery.equalTo("make", car.get("make"));
@@ -1251,142 +1352,94 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         edmundsQuery.lessThanOrEqualTo("frequency", 4);
         edmundsQuery.greaterThanOrEqualTo("frequency", 3);
         var serviceQuery = new Parse.Query("Service");
-        serviceQuery.each(function(service) {
-            serviceList.push([service.get("item"), service.get("action"), service.get("priority")]);
-        }).then(function() {
-            edmundsQuery.find({
-                success: function(services) {
-                    // if services have already been pulled to our database, continue to loadedEdmundServices
-                    if (services.length > 0) {
-                        console.log(car.get("make") + " " + car.get("model") + " " + car.get("year") + " " + "edmundsQuery services: ");
-                        console.log(services);
-                        loadedEdmundsServices(services, serviceList);
-                        // otherwise we pull edmund services
-                    } else {
-                        console.log("Edmunds Services for " + car.get("make") + " " + car.get("model") + " " + car.get("year") + " not stored in EdmundService table");
-                        // if the edmunds services have already been grabbed and there are still no services, then end the function and save the car
-                        if (newServices) {
-                            carSave(false);
-                        }
-                        newServices = true;
-                        // making a request to Edmunds based on makeModelYearId
-                        Parse.Cloud.httpRequest({
-                            url: EDMUNDS_API.requestPaths.makeModelYearId(
-                                car.get('make'),
-                                car.get('model'),
-                                car.get('year')
-                            ),
-                            success: function(results) {
-                                carMakeModelYearId = JSON.parse(results.text).id;
-                                Parse.Cloud.httpRequest({
-                                    url: EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId),
-                                    success: function(loaded) {
-                                        var edmundsServices = JSON.parse(loaded.text).actionHolder;
-                                        console.log("Calling loadedEdmundsServices with: ");
-                                        console.log(edmundsServices);
-                                        // go save the edmunds to the database
-                                        Parse.Cloud.run("addEdmundsServices", { //run with carServicesUpdate
-                                            edmundServices: edmundsServices,
-                                            serviceList: serviceList,
-                                            carObject: {
-                                                make: car.get('make'),
-                                                model: car.get('model'),
-                                                year: car.get('year')
-                                            }
-                                        }, {
-                                            success: function(result) {
-                                                // if it works we call this same function recursively, as now length of history will be > 0, and we want to query them
-                                                // properly, as right now edmundsServices is a json object instead of a query
-                                                readEdmundsServices();
-                                            },
-                                            error: function(error) {
-                                                console.error(error);
-                                                carSave(false);
-                                            }
-                                        });
-                                    },
-                                    error: function(error) {
-                                        console.error("Could not get services from Edmunds for: " + carMakeModelYearId);
-                                        console.error(error);
-                                        carSave(false);
-                                    }
-                                });
-                            },
-                            error: function(error) {
-                                console.error("Could not get carMakeModelYearId from Edmunds");
-                                console.error("ERROR7: ", error);
-                                carSave(false);
-                            }
-                        });
-                    }
-                },
-                error: function(error) {
-                    //console.error("Could not find the car with ScannerId: ", scan["scannerId"]);
-                    console.error("ERROR6: ", error);
-                    carSave(false);
-                }
-            });
-        }, function(error) {
-            console.error(error);
-        });
+        var promises = [];
+
+        promises.push(edmundsQuery.find());
+        promises.push(serviceQuery.find());
+
+        console.log(promises)
+        console.log(promises.length)
+
+        Parse.Promise.when(promises).then(function(results) {
+            console.log(results)
+            var edmundsServices = results[0];
+            var approvedServices = results[1];
+            console.log(edmundsServices)
+            console.log(approvedServices)
+            console.log("# of edmunds services: " + edmundsServices.length);
+            console.log("# of approved services: " + approvedServices.length);
+
+            if (edmundsServices.length > 0) {
+                console.log("# of edmunds services found for " + car.get("VIN") + ": " + edmundsServices.length);
+                return getUpdatedRecalls(edmundsServices, approvedServices);
+
+            }
+            else {
+                console.log("no edmunds services found for " + car.get("VIN") + ", no service updated");
+                return;
+            }
+        })
     };
 
-    /*
-    This function gets called when the program is done loading
-    services from edmunds
-    */
-    var loadedEdmundsServices = function(edmundsServices, serviceList) {
-        // loop through all the edmundsServices and see if they are valid
+    var getpendingEdmundServices = function(edmundsServices, serviceList) {
+        var pendingEdmundServices = car.get("pendingEdmundServices");
+        var isValidService;
+        var intervalMileage;
+        var totalMileage = car.get("totalMileage");
+        var save;
+        var serviceEngineCode;
+        var carEngineCode = car.get("engine").split(" ");
+        var frequency;
+        var serviceObjectId;
+        var item;
+        var action;
+        var priority;
+        var saveService;
+
         for (var i = 0; i < edmundsServices.length; i++) {
-            var save = false;
-            var engineEdm = edmundsServices[i].get("engineCode");
-            var freq = edmundsServices[i].get("frequency");
-            var id = edmundsServices[i].id;
-            var intervalMileage = edmundsServices[i].get("intervalMileage");
-            var item = edmundsServices[i].get("item");
-            var action = edmundsServices[i].get("action");
-            var priority = edmundsServices[i].get("priority");
-            var ignore = true;
-            var engineCar = ["  ", "    "];
-            var isFixed = false;
-            var isValidService = false;
+            var currentService = edmundsServices[i];
+            isValidService = false;
+            engineCode = currentService.get("engine");
+            frequency = currentService.get("frequency");
+            serviceObjectId = currentService.id;
+            intervalMileage = currentService.get("intervalMileage");
+            item = currentService.get("item");
+            action = currentService.get("action");
+            priority = currentService.get("priority");
+            history = false;
+            historyMileage = 0;
+            saveService = false; // default
 
-            if (car.get("engine") !== undefined) {
-                engineCar = car.get("engine").split(" ");
-            }
-
-            /* dont allow no engine, check that the engine code matches ours.
-               our format: 1.6L V3 blah blah blah
-               theirs: 3Vabc1.6 (currently not checking V = V, or inline...) */
-            if (engineEdm === "0NAE" ||
-                engineEdm.charAt(0) !== engineCar[1].charAt(1) ||
-                engineEdm.slice(-3) !== engineCar[0].substring(0, 3)) {
+            if (engineCode === "0NAE" ||
+                engineCode.charAt(0) !== engineCar[1].charAt(1) ||
+                engineCode.slice(-3) !== engineCar[0].substring(0, 3)) {
+                console.log("invlaid / unsupported engingCode in edmunds service: " + engineCode + ", skipping");
                 continue;
             }
 
-            // dont allow mileage = 0
-            if (intervalMileage === 0) {
+            // dont allow mileage <= 0
+            if (intervalMileage <= 0) {
+                console.log("mileage <= 0 in edmunds service, skipping");
                 continue;
             }
 
             //check if our edmunds is in our allowed list of Services
-            for (var x = 0; x < serviceList.length; x++) {
-                if (serviceList[x][0] === item &&
-                    serviceList[x][1] === action) {
-                    ignore = false; // double breaking for loops is hard
-                    break;
-                }
+            for (var x = 0; x < serviceList.length && !isValidService; x++) {
+                isValidService = (serviceList[x][0] === item && serviceList[x][1] === action);
+
             }
             // the edmunds service doesnt exist in our list of approved services, go to next
-            if (ignore) continue;
+            if (!isValidService) {
+                console.log("unsupported edmunds services, skipping");
+                continue;
+            }
             if (priority === undefined || priority === 0) {
+                console.log("invalid priority: " + priority + ", skipping");
                 continue;
             }
 
             // get the history for this particular service
             // find the mileage of the last time it was done
-            var history = false;
-            var historyMileage = 0;
             for (var z = 0; z < edmundsHistory.length; z++) {
                 if (edmundsHistory[z][0] === id) {
                     history = true;
@@ -1396,57 +1449,97 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                 }
             }
 
-            /* frequency 3 means the service is done once
-               if it is freq 3 and there is history we dont show it(it was already done)
-               if there isnt history we show it if it passed the interval(minus 500)
-               the .4 is to only show services on a new car that are recent
-               EX: so if you put in your car at 100K, we dont show services that should have been done from 0-60k */
+            // validation done. checking whether service exists
 
-            // edmunds documents
-            // http://developer.edmunds.com/api-documentation/vehicle/service_maintenance/v1/
-
-            if (freq === 3) {
-                isFixed = true;
-                isValidService = true;
-            }
-            else if (freq === 4) {
-                isValidService = true;
-            }
-
-            var estimatedServiceMileage = 0;
-
-            if (history) {
-                estimatedServiceMileage = historyMileage + intervalMileage;
-            }
-            else {
-                // get the next interval service mileage
-                estimatedServiceMileage = Math.ceil(totalMileage / intervalMileage) * intervalMileage;
-            }
-
-            if (isFixed) {
-                // handles services with fixed mileage
-                // no logic for now
+            if (u.some(pendingEdmundServices, function(objectId) {
+                return objectId === serviceObjectId;
+            })) {
+                console.log("service " + serviceObjectId + " is already in pending edmunds services, skipping")
                 continue;
             }
-            else {
-                // handles services with interval mileage
-                if (Math.abs(totalMileage - estimatedServiceMileage) <= 500) {
-                    serviceStack.push(edmundsServices[i]);
+
+            var saveService = false;
+            dealerServices = true;
+            // get the history for this particular service
+            // find the mileage of the last time it was done
+            var history = false;
+            var historyMileage = 0;
+            for (var z = 0; z < intervalHistory.length; z++) {
+                if (intervalHistory[z][0] === service.id) {
+                    history = true;
+                    if (historyMileage < intervalHistory[z][1]) {
+                        historyMileage = intervalHistory[z][1];
+                    }
                 }
+            }
+
+            var nextServiceMileage = 0;
+            var multiplier = 0;
+
+            // if no history and within the interval(minus 500) than add it to pendingFixed
+            // NOTE: historyMileage is 0 if no history found
+
+            // frequency === 3 -> fixed mileage service
+            if (frequency === 3) {
+                if (history) {
+                    console.log("fixed mileage service " + serviceObjectId + "is alredy done. skipping");
+                    continue;
+                }
+                else {
+                    multiplier = 1;
+                }
+            }
+            else {
+                // frequency === 4 -> interval mileage service
+                if (history) {
+                    multiplier = 1;
+                }
+                else {
+                    if (totalMileage > 1) {
+                        //multiplier indicates what interval of mileage the next service is in
+                        multiplier = Math.round(totalMileage / (intervalMileage - 500 / 2));
+                    }
+                    else {
+                        multiplier = 1;
+                    }
+                }
+            }
+
+            multiplier = Math.max(multiplier, 1);
+            nextServiceMileage = intervalMileage * multiplier + historyMileage;
+
+            if (totalMileage >=  nextServiceMileage - 500) {
+                // save service if total milage is greater than of nextServiceMileage - 500
+                saveService = true;
+            }
+            else {
+                saveService = false;
+            }
+
+            console.log("history service found: " + history + ", history mileage: " + historyMileage);
+            console.log("current mileage: " + totalMileage);
+            console.log("intervalMileage: " + intervalMileage);
+            console.log("multiplier: " + multiplier);
+            console.log("nextServiceMileage: " + nextServiceMileage);
+            console.log("save service: " + saveService);
+            console.log("");
+
+            if (saveService) {
+                serviceStack.push(edmundsServices[i]);
             }
         }
         carSave(true);
-    }; //END loadedEdmundsServices
+    }
 
     /*
     This gets called  when all due services are added to the stack
     */
     var carSave = function(edmunds) {
-        console.log("car save");
+        console.log("saving car");
         console.log(serviceStack);
         var seen = [];
         var highestMileage = 0;
-        var servicesDue = [];
+        var pendingEdmundServices = [];
         var prioritySum = 0;
         var maxPriority = 1;
         var changed;
@@ -1487,19 +1580,19 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             serviceStack = serviceStack.slice(0, 5);
 
             // get rid of any old services
-            servicesDue = car.get("pendingEdmundServices");
-            if (servicesDue === undefined) servicesDue = [];
-            for (i = 0; i < servicesDue.length; i++) {
+            pendingEdmundServices = car.get("pendingEdmundServices");
+            if (pendingEdmundServices === undefined) pendingEdmundServices = [];
+            for (i = 0; i < pendingEdmundServices.length; i++) {
                 for (var z = 0; z < edmundsHistory.length; z++) {
-                    if (servicesDue[i] === edmundsHistory[z][0]) {
-                        servicesDue.splice(i, 1); // remove element at i
+                    if (pendingEdmundServices[i] === edmundsHistory[z][0]) {
+                        pendingEdmundServices.splice(i, 1); // remove element at i
                     }
                 }
             }
 
             // XXX: what if a new service is added to the edmunds service table?
             // right now we only pull that data once per car so it doesnt matter
-            // add new services to the servicesDue array
+            // add new services to the pendingEdmundServices array
             for (i = 0; i < serviceStack.length; i++) {
                 var service = serviceStack[i];
                 if (service.get("priority") > maxPriority) {
@@ -1507,25 +1600,29 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                 }
                 prioritySum += service.get("priority");
                 // if they arent already in it
-                if (servicesDue.indexOf(service.id) === -1 && servicesDue.length < 5) { // to a limit of 5
-                    servicesDue.push(service.id);
+                if (pendingEdmundServices.indexOf(service.id) === -1 && pendingEdmundServices.length < 5) { // to a limit of 5
+                    pendingEdmundServices.push(service.id);
                 }
             }
             // see if we are setting new values
-            if (car.get("pendingEdmundServices").sort().toString() === servicesDue.sort().toString()) {
+            if (car.get("pendingEdmundServices").sort().toString() === pendingEdmundServices.sort().toString()) {
                 changed = false;
-            } else {
-                car.set("pendingEdmundServices", servicesDue);
+            }
+            else {
+                car.set("pendingEdmundServices", pendingEdmundServices);
                 car.set("pendingIntervalServices", []);
                 car.set("pendingFixedServices", []);
                 changed = true;
             }
-        } else { // edmunds isnt used
+        }
+        else { // edmunds isnt used
             // see if we are setting new values
+            console.log("saving car: " + car.get("VIN"));
             if ((car.get("pendingIntervalServices").sort().toString() === pendingInterval.sort().toString()) &&
                 (car.get("pendingFixedServices").sort().toString() === pendingFixed.sort().toString())) {
                 changed = false;
-            } else {
+            }
+            else {
                 car.set("pendingEdmundServices", []);
                 car.set("pendingIntervalServices", pendingInterval);
                 car.set("pendingFixedServices", pendingFixed);
@@ -1534,14 +1631,15 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
 
         // if there are services and they are new, send a notification
-        if (changed && (pendingFixed.length + pendingInterval.length + servicesDue.length > 0)) {
+        if (changed && (pendingFixed.length + pendingInterval.length + pendingEdmundServices.length > 0)) {
             // if services due == 0, then there is a pending fixed or interval
             // thus when checking the priority sum, we know there are services due, so check priority > 5
-            if (servicesDue.length === 0 || prioritySum > 5) {
-                saveNotification(servicesDue, maxPriority);
+            if (pendingEdmundServices.length === 0 || prioritySum > 5) {
+                saveNotification(pendingEdmundServices, maxPriority);
             }
             car.set("serviceDue", true);
-        } else {
+        }
+        else {
             car.set("serviceDue", false);
         }
 
@@ -1559,16 +1657,17 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     };
 
     //saves new notifications
-    var saveNotification = function(servicesDue, maxPriority) {
+    var saveNotification = function(pendingEdmundServices, maxPriority) {
         //set notifications object
         var Notification = Parse.Object.extend("Notification");
         var notificationToSave = new Notification();
-        var notificationContent = car.get("make") + " " + car.get("model") + " has " + (servicesDue.length + pendingFixed.length + pendingInterval.length);
+        var notificationContent = car.get("make") + " " + car.get("model") + " has " + (pendingEdmundServices.length + pendingFixed.length + pendingInterval.length);
         var notificationTitle = car.get("make") + " " + car.get("model") + " has ";
-        if ((servicesDue.length + pendingFixed.length + pendingInterval.length) != 1) {
+        if ((pendingEdmundServices.length + pendingFixed.length + pendingInterval.length) != 1) {
             notificationContent += " services due";
             notificationTitle += "services due";
-        } else {
+        }
+        else {
             notificationContent += " service due";
             notificationTitle += "a service due";
         }
@@ -1576,21 +1675,24 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         // severity based on https://github.com/ansik-pitstop/Pitstop-Wiki/wiki/Priority-and-Severity
         if (maxPriority == 1) {
             notificationTitle += " (Low)";
-        } else if (maxPriority == 2) {
+        }
+        else if (maxPriority == 2) {
             notificationTitle += " (Medium)";
-        } else if (maxPriority == 3) {
+        }
+        else if (maxPriority == 3) {
             notificationTitle += " (High)";
-        } else if (maxPriority > 3) {
+        }
+        else if (maxPriority > 3) {
             notificationTitle += " (Severe)";
         }
 
         /*
-        for (var i = 0; i < servicesDue.length; i++){
+        for (var i = 0; i < pendingEdmundServices.length; i++){
               //add services to string
             if (notificationContent.length < 60){
-                var service = servicesDue[i];
+                var service = pendingEdmundServices[i];
                 notificationContent += service.get("action") + " " + service.get("item");//description...
-                if (i < servicesDue.length - 1){
+                if (i < pendingEdmundServices.length - 1){
                     notificationContent += ", ";
                 }
             }
@@ -1612,10 +1714,10 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
             }
         });
 
-        // servicesDue.length === 0 means that there are no edmunds services, which means there are dealerservices
+        // pendingEdmundServices.length === 0 means that there are no edmunds services, which means there are dealerservices
         // we dont notify anyone about edmunds services
         // so if below condition is true, there are dealer services and we will send an email to the dealer about it
-        if (servicesDue.length === 0) {
+        if (pendingEdmundServices.length === 0) {
             shopQuery = new Parse.Query("Shop");
             shopQuery.equalTo("objectId", car.get("dealership"));
             shopQuery.first({
