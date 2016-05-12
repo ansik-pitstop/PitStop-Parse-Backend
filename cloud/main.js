@@ -415,74 +415,57 @@ Parse.Cloud.afterSave("Car", function(request) {
             mileage = car.get("baseMileage");
         }
 
-        // run carservice update
-        Parse.Cloud.run("carServicesUpdate", {
-            carVin: car.get("VIN"),
-            mileage: mileage
-        }, {
-            success: function(result) {
-                console.log("success: ");
-                console.log(result);
-            },
-            error: function(error) {
-                console.log(error);
-                console.error(error);
-            }
-        });
-    }
+        // add edmunds services
 
-    // *** Edmunds is no longer used ***
-    //   if (!request.object.existed()){
-    // // if (!request.object.existed()){
-    //      // making a request to Edmunds for makeModelYearId
-    //     Parse.Cloud.httpRequest({
-    //         url: EDMUNDS_API.requestPaths.makeModelYearId(
-    //             car.get('make'),
-    //             car.get('model'),
-    //             car.get('year')
-    //         ),
-    //         success: function (results) {
-    //             carMakeModelYearId = JSON.parse(results.text).id;
-    //             // saving recalls to database
-    //             Parse.Cloud.httpRequest({
-    //                 url: EDMUNDS_API.requestPaths.recall(carMakeModelYearId),
-    //                 success: function (results) {
-    //                     var edmundsRecalls = JSON.parse(results.text).recallHolder;
-    //                     console.log("got edmunds recalls");
-    //                     Parse.Cloud.run("addEdmundsRecalls", {
-    //                             recalls: edmundsRecalls,
-    //                             carObject:
-    //                             {
-    //                                 make: car.get('make'),
-    //                                 model: car.get('model'),
-    //                                 year: car.get('year')
-    //                             }
-    //                         }, {
-    //                             success: function(result){
-    //                                 console.log("success: ")
-    //                                 console.log(result)
-    //                             },
-    //                             error: function(error){
-    //                                 console.log("addEdmundsServices error:");
-    //                                 console.error(error);
-    //                             }
-    //                         }
-    //                     );
-    //
-    //                 },
-    //                 error: function (error) {
-    //                     console.error("Could not get recalls from Edmunds for: " + carMakeModelYearId);
-    //                     console.error(error);
-    //                 }
-    //             });
-    //         },
-    //         error: function (error) {
-    //             console.error("Could not get carMakeModelYearId from Edmunds in car aftersave");
-    //             console.error("ERROR: ", error);
-    //         }
-    //     });
-    //     return;
-    // }
+        console.log("getting vechicle id from edmunds");
+
+        var edmundServices = undefined;
+        var approvedServices = undefined;
+
+        Parse.Cloud.httpRequest({
+            url: EDMUNDS_API.requestPaths.makeModelYearId(
+                car.get('make'),
+                car.get('model'),
+                car.get('year')
+            )
+        }).then(function(result) {
+            var carMakeModelYearId = JSON.parse(result.text).id;
+            var url = EDMUNDS_API.requestPaths.maintenance(carMakeModelYearId);
+            console.log("vechicle id: " + carMakeModelYearId);
+            var params = {
+                url: url
+            }
+            console.log("getting edmunds services from: " + url);
+
+            return Parse.Cloud.httpRequest(params);
+        }).then(function(services) {
+            edmundServices = JSON.parse(services.text).actionHolder;
+
+            var query = new Parse.Query("Service");
+
+            console.log("getting approved edmunds services");
+
+            return query.find();
+        }).then(function(services) {
+            approvedServices = services;
+
+            console.log("# of edmunds services found: " + edmundServices.length);
+            console.log("# of approved services found: " + approvedServices.length);
+
+            var req = {};
+            req.params = {
+                edmundServices: edmundServices,
+                serviceList: approvedServices,
+                carObject:
+                {
+                    make: car.get('make'),
+                    model: car.get('model'),
+                    year: car.get('year')
+                }
+            }
+            return addEdmundsServices(req);
+        })
+    }
 
     //should run job/func here to update services/mileage at an interval
 });
@@ -984,7 +967,7 @@ Parse.Cloud.afterSave("Notification", function(request) {
 });
 
 // we query edmunds then run this function that parses what it sent back and adds rows to the edmundsservice table
-Parse.Cloud.define("addEdmundsServices", function(request, status) {
+var addEdmundsServices = function(request) {
     var serviceList = request.params.serviceList;
     var createEdmundsService = function(service, carObject) {
         var Edmunds = Parse.Object.extend("EdmundsService");
@@ -1041,17 +1024,15 @@ Parse.Cloud.define("addEdmundsServices", function(request, status) {
     // save them all at once.
     Parse.Object.saveAll(services, {
         success: function(data) {
-            console.log("service saved");
-            status.success("service saved"); // success for cloud function
+            console.log("edmunds service saved");
         },
         error: function(saveError) {
-            console.log("service not saved");
-            console.error(saveError);
-            status.error("service not saved"); //failure for cloud function
+            console.error("service not saved");
+            console.error(saveError.message);
         }
     });
 
-});
+}
 
 Parse.Cloud.define("addEdmundsRecalls", function(request, status) {
     var createEdmundsService = function(recall, carObject) {
