@@ -648,7 +648,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
                     if (key2 === "2105" && points > 15 && (hash[key2] > high)) { //looks for rapid changes indicative of leaks
                         if (owner !== undefined) {
                             console.log("out of bounds" + key2 + ", average:" + hash[key2] + "high" + high + " low:" + low);
-                            var Notification = Parse.Object.extend("Notification");
+                            var Notification = Parse.Object.extend("NotificationArchived");
                             var notificationToSave = new Notification();
                             var notificationContent = "key:" + key2 + " value:" + hash[key2] + " high:" + high + " low:" + low + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
                             var notificationTitle = "Coolant Temp Alert!";
@@ -674,7 +674,7 @@ Parse.Cloud.afterSave("Scan", function(request) {
                     if (key2 === "2106" && points > 15 && ((Math.abs(average) > 1.5 && sigma > 5.0) || (sigma > 6.0))) { //accounts for shift of peak
                         if (owner !== undefined) {
                             console.log("out of bounds" + key2 + ", average:" + hash[key2] + " mean:" + average + " sigma:" + sigma);
-                            var Notification = Parse.Object.extend("Notification");
+                            var Notification = Parse.Object.extend("NotificationArchived");
                             var notificationToSave = new Notification();
                             var notificationContent = "key:" + key2 + " value:" + hash[key2] + " mean:" + average + " sigma:" + sigma + " dataPoints:" + points + " timestamp:" + timestamp + " id:" + request.object.id;
                             var notificationTitle = "algorithm alert!";
