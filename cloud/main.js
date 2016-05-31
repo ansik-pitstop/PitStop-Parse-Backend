@@ -107,6 +107,15 @@ Parse.Cloud.beforeSave("Scan", function(request, response) {
                         else if (id === "2101") {
                             data = data % 128;
                         }
+                         else if (id === "2142") {
+                        	data = ((256*x2)+x1)/1000.0
+                        }
+                        else if (id === "213C") {
+                        	data = (((256*x2)+x1)/10.0)-40.0
+                        }
+                        else if (id === "2144") {
+                        	data = (2*(256*x2)+x1)/65536.0
+                        }
                         // save new pid
                         pids[j]['data'] = data;
                     }
