@@ -1126,7 +1126,12 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
     query.find({
         success: function(cars) {
             if (cars.length > 0) {
-                foundCar(cars[0]);
+                return foundCar(cars[0]).then(function(result) {
+                    response.success("service update started");
+                }).then(null, function(error) {
+                    response.error("service update failed: " + error.message);
+                })
+
             }
             else {
                 response.error("No results for car with VIN: " + scan['carVin']);
@@ -1178,25 +1183,36 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
 
         // get history of each of the 3 services for the car
+        console.log("getting service history for car " + car.id);
         var ServiceHistoryQuery = new Parse.Query("ServiceHistory");
         ServiceHistoryQuery.equalTo("carId", car.id);
-        ServiceHistoryQuery.each(function(history) {
-            var type = history.get("type");
-            var objID = history.get("serviceObjectId");
-            var mileage = history.get("mileage");
+        return ServiceHistoryQuery.find().then(function(services) {
+            if (!services) {
+                console.log("no services found");
+            }
+            else {
+                console.log("# of service history found: " + services.length);
+                for (var i = 0; i < services.length; i++) {
+                    var history = services[i];
+                    var type = history.get("type");
+                    var objID = history.get("serviceObjectId");
+                    var mileage = history.get("mileage");
 
-            // check whether current service exists in pending services
-            if (type === 0) { // edmunds
-                edmundsHistory.push([objID, mileage]);
-            }
-            else if (type === 1) { // fixed
-                fixedHistory.push([objID, mileage]);
-            }
-            else if (type === 2) { // interval
-                intervalHistory.push([objID, mileage]);
+                    // check whether current service exists in pending services
+                    if (type === 0) { // edmunds
+                        edmundsHistory.push([objID, mileage]);
+                    }
+                    else if (type === 1) { // fixed
+                        fixedHistory.push([objID, mileage]);
+                    }
+                    else if (type === 2) { // interval
+                        intervalHistory.push([objID, mileage]);
+                    }
+                }
             }
         }).then(function() {
             // if we have a dealership we do the dealerships services, otherwise we use edmunds
+            console.log("checking services for car " + car.get("VIN") + " with shop " + car.get("dealership"));
             if (car.get("dealership")) {
                 // DEALER FIXED SERVICES
                 // NOTE: fixed sericve not supported
@@ -1234,95 +1250,96 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
                 var intervals = new Parse.Query("ServiceInterval");
                 // filter for same dealership and mileage less than current total
                 intervals.equalTo("dealership", car.get("dealership"));
-                intervals.each(function(service) {
-                    if (u.some(pendingInterval, function(objectId) {
-                        return objectId === service.id;
-                    })) {
-                        console.log("service " + service.id + " is already in pending service, skipping")
-                        return; // dont update existing service
+                return intervals.find().then(function(intervalServices) {
+                    console.log("# of available interval services found: " + intervalServices.length);
+
+                    if (!intervalServices || intervalServices.length < 1) {
+                        console.log("dealership has no services, checking edmunds services instead");
+                        return updateEdmundServices();
                     }
 
-                    var saveService = false;
-                    dealerServices = true;
-                    // get the history for this particular service
-                    // find the mileage of the last time it was done
-                    var history = false;
-                    var historyMileage = 0;
-                    for (var z = 0; z < intervalHistory.length; z++) {
-                        if (intervalHistory[z][0] === service.id) {
-                            history = true;
-                            if (historyMileage < intervalHistory[z][1]) {
-                                historyMileage = intervalHistory[z][1];
-                            }
-                        }
-                    }
+                    for (var i = 0; i < intervalServices.length; i++) {
+                        var service = intervalServices[i];
 
-                    var totalMileage = car.get("totalMileage");
-                    var intervalMileage = service.get("mileage");
-                    var nextServiceMileage = 0;
-                    var multiplier = 0;
+                        console.log("checking service " + service.id)
 
-                    // if no history and within the interval(minus 500) than add it to pendingFixed
-                    // NOTE: historyMileage is 0 if no history found
-
-                    if (history) {
-                        multiplier = 1;
-                    }
-                    else {
-                        if (totalMileage > 1) {
-                            //multiplier indicates what interval of mileage the next service is in
-                            multiplier = Math.round(totalMileage / (intervalMileage - 500 / 2));
+                        if (u.some(pendingInterval, function(objectId) {
+                            return objectId === service.id;
+                        })) {
+                            console.log("service " + service.id + " is already in pending service, skipping")
+                            continue; // dont check mileage
                         }
                         else {
+                            console.log("service " + service.id + " not in history, considering as new service");
+                        }
+
+                        var saveService = false;
+                        dealerServices = true;
+                        // get the history for this particular service
+                        // find the mileage of the last time it was done
+                        var history = false;
+                        var historyMileage = 0;
+                        for (var z = 0; z < intervalHistory.length; z++) {
+                            if (intervalHistory[z][0] === service.id) {
+                                history = true;
+                                if (historyMileage < intervalHistory[z][1]) {
+                                    historyMileage = intervalHistory[z][1];
+                                }
+                            }
+                        }
+
+                        var totalMileage = car.get("totalMileage");
+                        var intervalMileage = service.get("mileage");
+                        var nextServiceMileage = 0;
+                        var multiplier = 0;
+
+                        // if no history and within the interval(minus 500) than add it to pendingFixed
+                        // NOTE: historyMileage is 0 if no history found
+                        if (history) {
                             multiplier = 1;
+                        }
+                        else {
+                            if (totalMileage > 1) {
+                                //multiplier indicates what interval of mileage the next service is in
+                                multiplier = Math.round(totalMileage / (intervalMileage - 500 / 2));
+                            }
+                            else {
+                                multiplier = 1;
+                            }
+                        }
+                        multiplier = Math.max(multiplier, 1);
+
+                        nextServiceMileage = intervalMileage * multiplier + historyMileage;
+
+                        if (totalMileage >=  nextServiceMileage - 500) {
+                            // save service if total milage is greater than of nextServiceMileage - 500
+                            saveService = true;
+                        }
+                        else {
+                            saveService = false;
+                        }
+
+                        console.log("history service found: " + history + ", history mileage: " + historyMileage);
+                        console.log("current mileage: " + totalMileage);
+                        console.log("intervalMileage: " + intervalMileage);
+                        console.log("multiplier: " + multiplier);
+                        console.log("nextServiceMileage: " + nextServiceMileage);
+                        console.log("save service: " + saveService);
+                        console.log("");
+
+                        if (saveService) {
+                            console.log("saving service: " + service.id);
+                            pendingInterval.push(service.id);
+                            intervalDesc.push([service.get("item"), service.get("action")]);
                         }
                     }
 
-                    multiplier = Math.max(multiplier, 1);
-
-                    nextServiceMileage = intervalMileage * multiplier + historyMileage;
-
-                    if (totalMileage >=  nextServiceMileage - 500) {
-                        // save service if total milage is greater than of nextServiceMileage - 500
-                        saveService = true;
-                    }
-                    else {
-                        saveService = false;
-                    }
-
-                    // console.log("history service found: " + history + ", history mileage: " + historyMileage);
-                    // console.log("current mileage: " + totalMileage);
-                    // console.log("intervalMileage: " + intervalMileage);
-                    // console.log("multiplier: " + multiplier);
-                    // console.log("nextServiceMileage: " + nextServiceMileage);
-                    // console.log("save service: " + saveService);
-                    // console.log("");
-
-                    if (saveService) {
-                        console.log("saving service: " + service.id);
-                        pendingInterval.push(service.id);
-                        intervalDesc.push([service.get("item"), service.get("action")]);
-                    }
-
-                }).then(function() {
-                    console.log("dealerServices: " + dealerServices);
-                    // if no dealership, show edmunds services
-                    // XXX there should be a better way to do this: a boolean in shop table?
-                    if (!dealerServices) { // car has no dealership or dealership has no services
-                        console.log("no dealearship specific service found. checking edmunds services");
-                        updateEdmundServices();
-                    }
-                    else {
-                        console.log("dealership specific services found.");
-                        carSave(false);
-                    }
-                }, function(error) {
-                    alert("Error: " + error.code + " " + error.message);
-                });
+                    carSave(false);
+                })
             }
             else {
                 console.log("no dealearship specific service found. checking edmunds services");
-                updateEdmundServices();
+                return updateEdmundServices();
             }
         }, function(error) {
             alert("Error: " + error.code + " " + error.message);
@@ -1607,7 +1624,9 @@ Parse.Cloud.define("carServicesUpdate", function(request, response) {
         }
         else { // edmunds isnt used
             // see if we are setting new values
-            console.log("saving car: " + car.get("VIN"));
+            console.log("saving services for car: " + car.get("VIN"));
+            console.log(car.get("pendingIntervalServices").sort().toString())
+            console.log(pendingInterval.sort().toString())
             if ((car.get("pendingIntervalServices").sort().toString() === pendingInterval.sort().toString()) &&
                 (car.get("pendingFixedServices").sort().toString() === pendingFixed.sort().toString())) {
                 changed = false;
