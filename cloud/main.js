@@ -867,7 +867,7 @@ Parse.Cloud.define("updateDtcs", function(request, response) {
         email.setSubject("Notification sent to " + user.get("name"));
         // we need to delay the email by 70 hours to give them time to respond - shiva
         // sendat is limited to 72 hours in the future i think.
-        email.setSendAt(parseInt(new Date().toUTCString()) + 70 * 60 * 60); // 60 seconds * 60 minutes * 70 hours = 70 hour delay
+        email.setSendAt(parseInt(new Date().toUTCString()) + 0); // 0 seconds * 0 minutes * 0 hours = 0 hour delay
         email.setHTML(emailHtml);
 
         sendgrid.sendEmail(email, {
