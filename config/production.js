@@ -1,5 +1,5 @@
 var globalConfig = {
-    databaseURI: 'mongodb://David:mousemouse18@ds119588.mlab.com:19588/parsedaviddev',
+    databaseURI: 'mongodb://parse-production:passwordPitstop@52.22.48.116:21127/push-notification-production',
     serverURL: 'http://localhost:8081/parse',
     appId: 'uURx2iGflDgd5SUydxUdCUDjL6jfj4qHIPeNcEeb',
     secrets: {
