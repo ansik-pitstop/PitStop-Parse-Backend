@@ -1,317 +1,164 @@
-# PitStop-Backend
-This repository contains the code for the PitStop’s backend. The PitStop backend is powered by Ruby on Rails and uses [Parse][1] to store the data.
-
-<<<<<<< Updated upstream
-=======
-This document contains all the details for you to start expanding and debugging the backend. Please read this document carefully.
-
-- [Contribution Guide][2]
-	- Documentation
-	- Formatting
-	- Branches
-	- Pull Requests
-	- Issues
-	- Coding Conventions
-- [Data Structures and Classes][3]
-	- User Class
-	- Shop Class
-	- Notification Class
-	- NotificationMessage Class
-	- Car Class
-	- Scan Class
-	- Code Class
-	- Solution Class
-	- FAQ Class
-	- Ticket Class
-	- TicketMessage Class
-- [User Roles][4]
-	- Consumer
-	- Mechanic
-	- Admin
-- [REST API][5]
-	- POST Requests
-	- GET Requests
-
-## Contribution Guide
-This section is a must-read. This section goes over all the guidelines of contributing to this project.
-
-### Documentation
-You’re supposed to update the documentation whenever you add something new to the codebase or change something in the codebase. We don’t want to end up with non-sense code in the codebase. 
-
-### Formatting
-You’re supposed to follow certain formatting when writing the documentation.
-
-**Table of reference:** always append the new entries to the table of reference above. Please make sure that things are added in the right section.
-
-**Correct Headings:** please use the correct headings when writing the documentation. Never go any deeper than H3 (###).
-
-**Use code blocks:** please put your code in code blocks. For example: 
-
-	var myFunction = function () {
-	    alert(“My Awesome Function”);
-	};
-
-**Use block quotes:** they look fancy
-
-> You've baked a really lovely cake, but then you've used dog shit for frosting. - Steve Jobs
-
-### Branches
-
-** NEVER PUSH TO MASTER BRANCH: ** make a separate development branch for your self and push your changes to that branch.
-
-### Pull Requests
-Whenever your code is ready to be merged with rest of the codebase, make a pull request to the master branch and include the following in the pull request.
-- What you changed and why you had to do it
-- Cite the issues related to the pull request
-- Any possible issues that the change can cause
-
-### Issues
-We use the Github issue system to both track bugs and assign tasks, please report issues and bugs whenever you encounter them. 
-Also always check your Github notifications to keep up with the issues that you were assigned to.
-
-### Coding Conventions
-
-**Variable Naming:** we use the camel-case style with the first character being lowercase. For example `myVariableForSomething` is a good name. Please choose meaningful names.
-
-**Class Naming:** the same rules for variables but the first character should also be uppercase. For example `MyClassName` is a good name.
-
-**USE SEMICOLONS:** Just use them.
-
-**USE BLOCKs: ** use `{ }` blocks for if, for, while, else and etc.
-
-**{ Goes on the same line as statement: ** nobody likes {s on a new line.
-
-**Comment the code: ** this is how you should comment the code
-
-	/*
-	 myFunction: this function performs the x task by consuming the Y variable and calculating the Z value.
-	
-	    TODO: optimize the for loop to reduce memory ussage.
-	
-	Edit By: Khashayar Pourdeilami
-	On: June 16th 2015 at 5:35pm
-	
-	By: Khashayar Pourdeilami
-	On: Jun 15th 2015 at 3:15pm
-	 */
-
-**Keep the code legible: ** please don’t leave a mess behind. The following example is a good style of coding.
-
-	var myFunction = function (x, y, callback) {
-	    // Initializing
-	    var a = someFn(x);
-	    var b = someFn(b);
-	
-	    // Processing
-	    performSomeFunction(function (success) {
-	        console.log("YAY! Success at myFunction: ", success);
-	        callback(success, true);
-	    }, function (error) {
-	        console.log("No! Error at myFunction: ", error);
-	        callback(error, false);
-	    }, [a, b]);
-	
-	    //Finalizing
-	    return;
-	}
-
-## Data Structures an d Classes
-The following are the data structures and classes that PitStop will be using.
-The attributes are already provided by the data being returned from the database, the methods only need to be implemented for each platform.
-
-### User Class
-
-**Attributes**
-- objectId: String
-- username: String 
-- password: String
-- authData: authData
-- emailVerified: Bool
-- email: String
-- name: String
-- phoneNumber: String
-- createdAt: Date
-- updatedAt: Date 
-- ACL: ACL
-- activated: Bool
-- totalSpent: Float
-- totalServies: Integer
-- subscribedShop: String
-- role: String
-
-**Methods**
-- *Constructor (String objectId):* this function will use the objectId provided to load the desired user from database into the memory.
-- *getCars ():* this function will use the objectId attribute to get the cars owned by the user.
-- *getNotifications ():* this function will use the objectId attribute to get the notifications intended for the user sorted by the notifications’ updatedAt attribute.
-- *newCar (String VIN):* this function will use a car’s VIN number and will add it to the database.
-
-**Related Functions**
-- *newUser (String name, String email, String phoneNumber, String username, String password):* this function will use the provided data to add a new user to the database.
-
-### Shop Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- activationDate: Date
-- renewalDate: Date
-- activated: Bool
-- name: String
-- email: String
-- phoneNumber: String
-- totalServices: Integer
-- totalMade: Integer
-- addressText: String
-- addressCoordinates: Array
-- reviewPoint: Integer
-- reviewCount: Integer
-
-**Methods**
-- *Constructor (String objectId):* this function will use the objectId provided to the load the desired shop from database into the memory.
-- *getCustomers ():* this function will use the shop’s objectId to get the customers listed on the shop.
-- *getNotifications ():* this function will use the objectId attribute to get the notifications intended for the shop sorted by the notifications’ updatedAt attribute.
-- *getReview ():* this function will use the objectId attribute to get review of the shop sorted by reviews’ createdAt attribute.
-- *addUser (String objectId, String role):* this function will add a new user to the shop.
-- *removeUser (String objectId):* this function will remove the given user from the shop.
-- *removeCustomer (Sting objectId):* this function will remove the given customer from the shop.
-
-**Related Functions**
-- *newShop (String name, String email, String phoneNumber, String addressText, String addressCoordinates): * this function will get the information provided and will add a new shop to the database.
-
-### Notification Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- type: String
-- byId: String
-- toId: String
-- title: String
-- content: String
-- scanId: String
-- carId: String
-- messageCount: Integer
-
-**Methods**
-- *Constructor (String objectId):* this function will load the desired notification into the memory.
-- *addMessage (String toId, String title, String content):* this function will create a new message and will store it on the database.
-
-**Related Functions**
- - *addNotification (String toId, String type, String title, String content, String DTCs, String carId):* this function will create a new notification and will store it on the database.
-
-### NotificationMessage Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- title: String
-- content: String
-- notificationId: String
-- byId: String
-
-**Related Functions**
-- *addMessage (String toId, String title, String content):* this function will create a new message and will store it on the database.
-
-### Car Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- model: String
-- make: String
-- year: Integer
-- engine: String
-- VIN: String
-- owner: String
-- scannerUUID: String
-- scannerId: String
-- serviceDue: Integer
-- serviceBy: String
-- serviceDate: Date
-
-**Methods**
-- *Constructor (String objectId):* this function will get a objectId and will load the desired data into the memory.
-- *removeCar ():* this function will remove the car from user’s account.
-
-### Scan Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- DTCs: Array
-- PIDs: Dictionary
-
-**Methods**
-- *Constructor (String objectId):* this function will get a objectId and will load the desired data into the memory.
-
-**Related Functions**
-- *addScan (String DTCs, Dictionary PIDs):* this function will get the DTCs and other PIDs and will store them on the database.
-
-### Code Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- code: String
-- description: String
-- bestSolution: String
-
-**Methods**
-
-- *Constructor (String objectId):* this function will get a objectId and will load the desired data into the memory.
-- *addSolution (String content):* this function will get the content and will add a new solution to the code.
-
- **Related Functions**
-- *addCode (String code, String description):* this function will get the code and it’s description then will store it in the database.
-
-### Solution Class
-
-**Attributes**
-- objectId: String
-- createdAt: Date
-- updatedAt: Date
-- ACL: ACL
-- content: String
-- code: String
-- karma: Integer
-- upVotedBy: Array
-- downVotedBy: Array
-
-**Methods**
-- *Constructor (String objectId):* this function will get a objectId and will load the desired data into the memory.
-- *edit (String newContent):* this function will update the content of the solution.
-- *remove ():* this function will remove the solution.
-
-### FAQ Class
-
-### Ticket Class
-
-### TicketMessage
-
-## User Roles
-The users will have different roles and hence different access levels on the platform.
-
-### Mechanic
-- has access to their own mechanic shop.
-- has access to all the consumer features.
-
-### Consumer
-- has full access to the app.
-
-### Admin
-- PitStop support member to moderate the entire system and provide support.
-
->>>>>>> Stashed changes
-[1]:	http://parse.com
+# parse-server-example
+
+Example project using the [parse-server](https://github.com/ParsePlatform/parse-server) module on Express.
+
+Read the full Parse Server guide here: https://github.com/ParsePlatform/parse-server/wiki/Parse-Server-Guide
+
+### For Local Development
+
+* Make sure you have at least Node 4.3. `node --version`
+* Clone this repo and change directory to it.
+* `npm install`
+* Install mongo locally using http://docs.mongodb.org/master/tutorial/install-mongodb-on-os-x/
+* Run `mongo` to connect to your database, just to make sure it's working. Once you see a mongo prompt, exit with Control-D
+* Run the server with: `npm start`
+* By default it will use a path of /parse for the API routes.  To change this, or use older client SDKs, run `export PARSE_MOUNT=/1` before launching the server.
+* You now have a database named "dev" that contains your Parse data
+* Install ngrok and you can test with devices
+
+### Getting Started With Heroku + mLab Development
+
+#### With the Heroku Button
+
+[![Deploy](https://www.herokucdn.com/deploy/button.png)](https://heroku.com/deploy)
+
+#### Without It
+
+* Clone the repo and change directory to it
+* Log in with the [Heroku Toolbelt](https://toolbelt.heroku.com/) and create an app: `heroku create`
+* Use the [mLab addon](https://elements.heroku.com/addons/mongolab): `heroku addons:create mongolab:sandbox --app YourAppName`
+* By default it will use a path of /parse for the API routes.  To change this, or use older client SDKs, run `heroku config:set PARSE_MOUNT=/1`
+* Deploy it with: `git push heroku master`
+
+### Getting Started With AWS Elastic Beanstalk
+
+#### With the Deploy to AWS Button
+
+<a title="Deploy to AWS" href="https://console.aws.amazon.com/elasticbeanstalk/home?region=us-west-2#/newApplication?applicationName=ParseServer&solutionStackName=Node.js&tierName=WebServer&sourceBundleUrl=https://s3.amazonaws.com/elasticbeanstalk-samples-us-east-1/eb-parse-server-sample/parse-server-example.zip" target="_blank"><img src="http://d0.awsstatic.com/product-marketing/Elastic%20Beanstalk/deploy-to-aws.png" height="40"></a>
+
+#### Without It
+
+* Clone the repo and change directory to it
+* Log in with the [AWS Elastic Beanstalk CLI](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/eb-cli3-install.html), select a region, and create an app: `eb init`
+* Create an environment and pass in MongoDB URI, App ID, and Master Key: `eb create --envvars DATABASE_URI=<replace with URI>,APP_ID=<replace with Parse app ID>,MASTER_KEY=<replace with Parse master key>`
+
+### Getting Started With Microsoft Azure App Service
+
+#### With the Deploy to Azure Button
+
+[![Deploy to Azure](http://azuredeploy.net/deploybutton.png)](https://azuredeploy.net/)
+
+#### Without It
+
+A detailed tutorial is available here:
+[Azure welcomes Parse developers](https://azure.microsoft.com/en-us/blog/azure-welcomes-parse-developers/)
+
+
+### Getting Started With Google App Engine
+
+1. Clone the repo and change directory to it 
+1. Create a project in the [Google Cloud Platform Console](https://console.cloud.google.com/).
+1. [Enable billing](https://console.cloud.google.com/project/_/settings) for your project.
+1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/).
+1. Setup a MongoDB server.  You have a few options:
+  1. Create a Google Compute Engine virtual machine with [MongoDB pre-installed](https://cloud.google.com/launcher/?q=mongodb).
+  1. Use [MongoLab](https://mongolab.com/google/) to create a free MongoDB deployment on Google Cloud Platform.
+1. Modify `app.yaml` to update your environment variables.
+1. Delete `Dockerfile`
+1. Deploy it with `gcloud preview app deploy`
+
+A detailed tutorial is available here:
+[Running Parse server on Google App Engine](https://cloud.google.com/nodejs/resources/frameworks/parse-server)
+
+### Getting Started With Scalingo
+
+#### With the Scalingo button
+
+[![Deploy to Scalingo](https://cdn.scalingo.com/deploy/button.svg)](https://my.scalingo.com/deploy)
+
+#### Without it
+
+* Clone the repo and change directory to it
+* Log in with the [Scalingo CLI](http://cli.scalingo.com/) and create an app: `scalingo create my-parse`
+* Use the [Scalingo MongoDB addon](https://scalingo.com/addons/scalingo-mongodb): `scalingo addons-add scalingo-mongodb free`
+* Setup MongoDB connection string: `scalingo env-set DATABASE_URI='$SCALINGO_MONGO_URL'`
+* By default it will use a path of /parse for the API routes. To change this, or use older client SDKs, run `scalingo env-set PARSE_MOUNT=/1`
+* Deploy it with: `git push scalingo master`
+
+### Getting Started With OpenShift Online (Next Gen)
+
+1. Register for a free [OpenShift Online (Next Gen) account](http://www.openshift.com/devpreview/register.html)
+1. Create a project in the [OpenShift Online Console](https://console.preview.openshift.com/console/).
+1. Install the [OpenShift CLI](https://docs.openshift.com/online/getting_started/beyond_the_basics.html#btb-installing-the-openshift-cli).
+1. Add the Parse Server template to your project: `oc create -f https://raw.githubusercontent.com/ParsePlatform/parse-server-example/master/openshift.json`
+1. Deploy Parse Server from the web console
+  1. Open your project in the [OpenShift Online Console](https://console.preview.openshift.com/console/):
+  1. Click **Add to Project** from the top navigation
+  1. Scroll down and select **NodeJS > Parse Server**
+  1. (Optionally) Update the Parse Server settings (parameters)
+  1. Click **Create**
+
+A detailed tutorial is available here:
+[Running Parse Server on OpenShift Online (Next Gen)](https://blog.openshift.com/parse-server/)
+
+# Using it
+
+Before using it, you can access a test page to verify if the basic setup is working fine [http://localhost:1337/test](http://localhost:1337/test).
+Then you can use the REST API, the JavaScript SDK, and any of our open-source SDKs:
+
+Example request to a server running locally:
+
+```curl
+curl -X POST \
+  -H "X-Parse-Application-Id: myAppId" \
+  -H "Content-Type: application/json" \
+  -d '{"score":1337,"playerName":"Sean Plott","cheatMode":false}' \
+  http://localhost:1337/parse/classes/GameScore
+  
+curl -X POST \
+  -H "X-Parse-Application-Id: myAppId" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://localhost:1337/parse/functions/hello
+```
+
+Example using it via JavaScript:
+
+```javascript
+Parse.initialize('myAppId','unused');
+Parse.serverURL = 'https://whatever.herokuapp.com';
+
+var obj = new Parse.Object('GameScore');
+obj.set('score',1337);
+obj.save().then(function(obj) {
+  console.log(obj.toJSON());
+  var query = new Parse.Query('GameScore');
+  query.get(obj.id).then(function(objAgain) {
+    console.log(objAgain.toJSON());
+  }, function(err) {console.log(err); });
+}, function(err) { console.log(err); });
+```
+
+Example using it on Android:
+```java
+//in your application class
+
+Parse.initialize(new Parse.Configuration.Builder(getApplicationContext())
+  .applicationId("myAppId")
+  .server("http://myServerUrl/parse/")   // '/' important after 'parse'
+  .build());
+
+ParseObject testObject = new ParseObject("TestObject");
+testObject.put("foo", "bar");
+testObject.saveInBackground();
+```
+Example using it on iOS (Swift):
+```swift
+//in your AppDelegate
+
+Parse.initializeWithConfiguration(ParseClientConfiguration(block: { (configuration: ParseMutableClientConfiguration) -> Void in
+  configuration.server = "https://<# Your Server URL #>/parse/" // '/' important after 'parse'
+  configuration.applicationId = "<# Your APP_ID #>"
+}))
+```
+You can change the server URL in all of the open-source SDKs, but we're releasing new builds which provide initialization time configuration of this property.
