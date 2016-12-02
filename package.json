@@ -16,9 +16,9 @@
   },
   "scripts": {
     "start-staging": "ALLOW_CONFIG_MUTATIONS=true ENVIRONMENT=staging ./node_modules/.bin/forever start ./forever/staging.json",
-    "stop-staging": "./node_modules/.bin/forever stop api-server-staging || exit 0",
+    "stop-staging": "./node_modules/.bin/forever stop parse-server-staging || exit 0",
     "start-production": "ALLOW_CONFIG_MUTATIONS=true ENVIRONMENT=production ./node_modules/.bin/forever start ./forever/production.json",
-    "stop-production": "./node_modules/.bin/forever stop api-server-production || exit 0"
+    "stop-production": "./node_modules/.bin/forever stop parse-server-production || exit 0"
   },
   "engines": {
     "node": ">=4.3"
