@@ -1,7 +1,7 @@
 var globalConfig = {
-	port: 10011,
+	port: 8081,
     databaseURI: 'mongodb://parse-production:passwordPitstop@52.22.48.116:21127/push-notification-dev',
-    serverURL: 'http://localhost:10011/parse',
+    serverURL: 'http://localhost:8081/parse',
     appId: 'ZYOmoKuYsa2LtOKPnBW7dGLNpYbYhZGHb6EBfl3S',
     secrets: {
         masterKey: 'TuBA6HGyIIut11ugvGjWG19jk9ba6JN8fgzZ6VYc',

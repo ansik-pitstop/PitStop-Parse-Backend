@@ -48,13 +48,7 @@ app.get('/', function (req, res) {
   res.status(200).send('Pistop-parse is ready');
 });
 
-var port = process.env.PORT || 10011;
-
-if (options.env == "staging") {
-  port = 10011;
-} else if (options.env == "production") {
-  port = 8081;
-}
+var port = process.env.PORT || 8081;
 
 var httpServer = require('http').createServer(app);
 httpServer.listen(port, function () {
