@@ -12,7 +12,7 @@ var globalConfig = {
         apiKey: 'AAAASBxJdjY:APA91bFWLjtUSjYcyKwY7ZsWpXarFEmMjrQRS1VOanKd7HtjUkbtxh68ETOqPDLC650TNOZn_n61oBVRCz3rt4b-qrSlKCQay7m83CR0OCyxHe2_iaXjmxQ9fN3N3pHe8xR8-N_jrEywoSddsQg8vD1FhHIUSbD3bw' // The Server API Key of GCM
     },
     ios: {
-        pfx: '/Users/David/Downloads/prod_push_prod.p12', // Prod PFX or P12
+        pfx: './secrets/prod_push_prod.p12', // Prod PFX or P12
         bundleId: 'pitstop.ansik.ios.appstore',
         production: true // Prod
     }
