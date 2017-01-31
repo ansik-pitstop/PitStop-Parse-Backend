@@ -24,7 +24,7 @@ var api = new ParseServer({
   appId: config.get('globalConfig.appId'),
   masterKey: config.get('globalConfig.secrets.masterKey'), //Add your master key here. Keep it secret!
   serverURL: config.get('globalConfig.serverURL'), // Don't forget to change to https if needed
-  javascriptKey: config.get('globalConfig.secrets.javascriptKey'),
+  // javascriptKey: config.get('globalConfig.secrets.javascriptKey'),
   push: {
     android: config.get('globalConfig.android'),
     ios: config.get('globalConfig.ios')
