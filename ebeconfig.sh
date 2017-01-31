@@ -11,7 +11,7 @@ $"option_settings:
     NODE_ENV: \"staging\"
     SERVER_URL: \"http://parseserverpush-staging.us-west-2.elasticbeanstalk.com/parse\"
   aws:elasticbeanstalk:container:nodejs:
-    NodeCommand: \"node index.js" > .ebextensions/app.config
+    NodeCommand: \"node index.js\"" > .ebextensions/app.config
     ;;
 
 production)
@@ -26,7 +26,7 @@ $"option_settings:
     NODE_ENV: \"production\"
     SERVER_URL: \"http://parseserverpush-production.us-west-2.elasticbeanstalk.com/\"
   aws:elasticbeanstalk:container:nodejs:
-    NodeCommand: \"node index.js" > .ebextensions/app.config
+    NodeCommand: \"node index.js\"" > .ebextensions/app.config
     ;;
 *) 
 echo $"Usage: bash $0 {staging|production}"
